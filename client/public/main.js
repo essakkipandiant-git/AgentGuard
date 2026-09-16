@@ -48,8 +48,8 @@
   const posture = `<div class="app-card posture-card"><div class="panel-title"><strong>SECURITY POSTURE</strong><span class="app-kicker">LAST SCAN / 12 SEC AGO</span></div><div class="posture-layout"><div><div class="score-ring"><div><strong>82</strong><small>/ 100</small></div></div><span class="score-good">GOOD</span></div><div><div class="breakdown-row"><span>Agent Identity</span><div class="bar"><i style="width:98%"></i></div><b>98%</b></div><div class="breakdown-row"><span>Policy Coverage</span><div class="bar"><i style="width:91%"></i></div><b>91%</b></div><div class="breakdown-row"><span>Tool Governance</span><div class="bar"><i style="width:87%"></i></div><b>87%</b></div><div class="breakdown-row"><span>Approval Coverage</span><div class="bar"><i style="width:74%"></i></div><b>74%</b></div><div class="breakdown-row"><span>Audit Coverage</span><div class="bar"><i style="width:99%"></i></div><b>99%</b></div></div></div><button class="row-action security-link" type="button">View security posture →</button></div>`;
   const risk = `<div class="risk-strip"><div class="risk-box"><small>CRITICAL</small><strong>2</strong></div><div class="risk-box"><small>HIGH</small><strong>7</strong></div><div class="risk-box"><small>MEDIUM</small><strong>18</strong></div><div class="risk-box"><small>LOW</small><strong>42</strong></div></div>`;
   const overview = () => `${header('OVERVIEW / SYSTEM STATUS','AgentGuard Control Center','Monitor every agent, policy and governed action from one place.',button('+ Add Agent','app-button primary'))}<div class="app-grid">${metrics}<div class="app-grid two">${posture}${activity}</div>${risk}</div>`;
-  const agentRows = `<tr data-detail="Research Agent"><td data-label="AGENT" class="agent-name">Research Agent</td><td data-label="STATUS">${badge('● ACTIVE')}</td><td data-label="RISK">${badge('LOW')}</td><td data-label="TOOLS">8 tools</td><td data-label="LAST ACTIVE">2 min ago</td><td data-label="POLICY">Research Policy</td><td data-label="ACTION"><button class="row-action agent-detail">View Agent →</button></td></tr><tr data-detail="Finance Agent"><td data-label="AGENT" class="agent-name">Finance Agent</td><td data-label="STATUS">${badge('● ACTIVE')}</td><td data-label="RISK">${badge('HIGH','warn')}</td><td data-label="TOOLS">12 tools</td><td data-label="LAST ACTIVE">18 sec ago</td><td data-label="POLICY">Finance Policy</td><td data-label="ACTION"><button class="row-action agent-detail">View Agent →</button></td></tr><tr data-detail="Support Agent"><td data-label="AGENT" class="agent-name">Support Agent</td><td data-label="STATUS">${badge('● ACTIVE')}</td><td data-label="RISK">${badge('MEDIUM','warn')}</td><td data-label="TOOLS">6 tools</td><td data-label="LAST ACTIVE">1 min ago</td><td data-label="POLICY">Support Policy</td><td data-label="ACTION"><button class="row-action agent-detail">View Agent →</button></td></tr><tr data-detail="Code Agent"><td data-label="AGENT" class="agent-name">Code Agent</td><td data-label="STATUS">${badge('● PAUSED','bad')}</td><td data-label="RISK">${badge('CRITICAL','bad')}</td><td data-label="TOOLS">14 tools</td><td data-label="LAST ACTIVE">4 min ago</td><td data-label="POLICY">Restricted Policy</td><td data-label="ACTION"><button class="row-action agent-detail">View Agent →</button></td></tr>`;
-  const agents = () => `${header('IDENTITY / AGENTS','Agents','Manage identities, permissions and security posture for every autonomous agent.',button('+ Register Agent','app-button primary'))}<div class="app-table-wrap"><div class="app-toolbar"><input class="table-search" placeholder="Search agents" aria-label="Search agents" /><span class="app-kicker">24 TOTAL / 21 ACTIVE</span></div><table class="app-table"><thead><tr><th>AGENT</th><th>STATUS</th><th>RISK</th><th>TOOLS</th><th>LAST ACTIVE</th><th>POLICY</th><th>ACTION</th></tr></thead><tbody>${agentRows}</tbody></table></div>`;
+  const agentRows = `<tr><td colspan="7">${empty('Loading Agents…')}</td></tr>`;
+  const agents = () => `${header('IDENTITY / AGENTS','Agents','Manage identities, permissions and security posture for every autonomous agent.',button('+ Register Agent','app-button primary'))}<div class="app-table-wrap"><div class="app-toolbar"><input class="table-search" placeholder="Search agents" aria-label="Search agents" /><span class="app-kicker">LOADING</span></div><table class="app-table"><thead><tr><th>AGENT</th><th>STATUS</th><th>RISK</th><th>TOOLS</th><th>LAST ACTIVE</th><th>POLICY</th><th>ACTION</th></tr></thead><tbody>${agentRows}</tbody></table></div>`;
   const policies = () => `${header('POLICY ENGINE / GOVERNANCE','Policies','Define exactly what agents can access, execute and change.',button('+ Create Policy','app-button primary'))}<div class="policy-list">${['Finance Agent Policy','Research Policy','Restricted Agent Policy','Default Agent Policy'].map((name,i)=>`<div class="policy-card"><div><h3>${name}</h3><p>${i===0?'12 agents · 38 rules':i===1?'8 agents · 24 rules':i===2?'4 agents · 18 rules':'0 agents · 12 rules'}</p></div><div class="policy-meta"><b>v${[4,7,2,1][i]}</b><br>${i===3?'DRAFT':'ACTIVE'}<br><br>${i*3+2} min ago</div></div>`).join('')}</div>`;
   const approvals = () => `${header('RISK / HUMAN REVIEW','Approvals','Review high-risk actions before they reach your infrastructure.',`<div class="app-kicker">12 PENDING / 84 APPROVED / 7 DENIED</div>`)}<div class="approval-list"><div class="approval-card"><div><span class="app-kicker">FINANCE AGENT / STRIPE</span><h3>Charge $2,400 <span class="status-badge warn">HIGH RISK</span></h3><p>Payment exceeds configured agent limit. Requested 09:41:04.</p></div><div class="approval-actions">${button('View Context')}<button class="app-button primary approve-action" type="button">Approve</button><button class="app-button danger deny-action" type="button">Deny</button></div></div><div class="approval-card"><div><span class="app-kicker">RESEARCH AGENT / DATABASE</span><h3>Write to customer_records <span class="status-badge warn">MEDIUM</span></h3><p>Write access requires human approval under research policy.</p></div><div class="approval-actions">${button('View Context')}<button class="app-button primary approve-action" type="button">Approve</button></div></div></div>`;
   const activityPage = () => `${header('OBSERVABILITY / TELEMETRY','Agent Activity','Real-time operational view of every governed action.',`<select class="app-toolbar-select"><option>All Agents</option><option>Finance Agent</option><option>Research Agent</option></select>`)}<div class="app-grid four"><div class="app-card"><span class="card-label">ACTIONS / MIN</span><div class="metric-large"><strong>1,284</strong><small>LIVE</small></div></div><div class="app-card"><span class="card-label">ACTIVE AGENTS</span><div class="metric-large"><strong>24</strong><small>+2 today</small></div></div><div class="app-card"><span class="card-label">BLOCKED</span><div class="metric-large"><strong>37</strong><small>2 critical</small></div></div><div class="app-card"><span class="card-label">PENDING</span><div class="metric-large"><strong>12</strong><small>Needs review</small></div></div></div><div class="app-card" style="margin-top:16px"><div class="panel-title"><strong>LIVE STREAM</strong><span class="live-label"><i></i>EVENTS ARRIVING</span></div>${activity.replace('<div class="app-card activity-panel">','').replace('</div>','')}</div>`;
@@ -62,7 +62,7 @@
   const team = () => `${header('ORGANIZATION / ACCESS','Team','Manage workspace members and access.',button('+ Invite Member','app-button primary'))}<div class="app-table-wrap"><table class="app-table"><thead><tr><th>USER</th><th>ROLE</th><th>LAST ACTIVE</th><th>ACCESS</th><th>ACTION</th></tr></thead><tbody>${[['Essakki','Administrator','Now','Owner'],['Maya Chen','Security Engineer','4 min ago','Security'],['Drew Patel','Developer','18 min ago','Developer'],['Alex Kim','Viewer','2 hr ago','Viewer']].map(r=>`<tr><td data-label="USER" class="agent-name">${r[0]}</td><td data-label="ROLE">${r[1]}</td><td data-label="LAST ACTIVE">${r[2]}</td><td data-label="ACCESS">${r[3]}</td><td data-label="ACTION"><button class="row-action">Edit →</button></td></tr>`).join('')}</tbody></table></div>`;
   const settings = () => `${header('ORGANIZATION / CONFIGURATION','Settings','Configure workspace security, notifications and policy defaults.')}${['GENERAL','SECURITY','NOTIFICATIONS','POLICY','AUDIT'].map((section,i)=>`<div class="settings-section"><h3>${section}</h3>${['Workspace Name','SSO','Approval Requests','Default Policy','Retention'][i] ? `<div class="setting-row"><span>${['Workspace Name','SSO','Approval Requests','Default Policy','Retention'][i]}</span>${i===0?'<input class="field-input" value="Acme Corporation" style="max-width:220px">':i===3?'<select class="field-input" style="max-width:220px"><option>Finance Agent Policy</option><option>Restricted Policy</option></select>':'<button class="switch active" type="button"></button>'}</div>`:''}<div class="setting-row"><span>${['Workspace ID','MFA','Blocked Actions','Policy Evaluation Mode','Export Settings'][i]}</span><span class="app-kicker">${i===0?'ws_acme_8f21a':i===1?'ENFORCED':i===2?'ENABLED':i===3?'REAL-TIME':'CSV / JSON'}</span></div></div>`).join('')}<div class="settings-section"><h3>DANGER ZONE</h3><div class="setting-row"><span>Delete Workspace</span><button class="app-button danger" type="button">Delete Workspace</button></div></div>`;
   const agentDetail = () => `${header('IDENTITY / AGENT','Research Agent','agent_research_042 · Current risk LOW',button('Pause Agent'))}<div class="app-grid two"><div class="app-card"><div class="panel-title"><strong>IDENTITY</strong>${badge('● ACTIVE')}</div><dl class="detail-list"><div><dt>AGENT ID</dt><dd>agent_research_042</dd></div><div><dt>CREATED</dt><dd>Aug 24, 2026</dd></div><div><dt>OWNER</dt><dd>Essakki</dd></div><div><dt>ENVIRONMENT</dt><dd>Production</dd></div><div><dt>AUTHENTICATION</dt><dd>Service Account</dd></div></dl></div><div class="app-card"><div class="panel-title"><strong>RISK PROFILE</strong>${badge('LOW')}</div><div class="score-ring" style="margin:18px auto"><div><strong>28</strong><small>/ 100</small></div></div><p style="text-align:center;color:#777;font-size:11px">Last evaluation 12 sec ago</p></div><div class="app-card"><div class="panel-title"><strong>TOOLS</strong><span class="app-kicker">8 CONNECTED</span></div><div class="activity-item"><b>Gmail</b><span>Read / Send</span>${badge('ALLOW')}</div><div class="activity-item"><b>Postgres</b><span>Read</span>${badge('ALLOW')}</div><div class="activity-item"><b>Slack</b><span>Read</span>${badge('ALLOW')}</div><div class="activity-item"><b>Shell</b><span>Execute</span>${badge('BLOCKED','bad')}</div></div><div class="app-card"><div class="panel-title"><strong>AGENT CONTROL MAP</strong></div><div class="arch-flow"><span class="arch-node primary">RESEARCH AGENT</span><span class="flow-step">IDENTITY</span><span class="flow-step">POLICY</span><span class="flow-step">TOOLS / 8</span><span class="flow-step">AUDIT</span></div></div></div>`;
-  const register = () => `${header('ONBOARDING / NEW IDENTITY','Register a new agent','Create a governed identity before connecting it to production tools.') }<div class="app-card"><div class="stepper"><span class="step active">01 Identity</span><span class="step">02 Connect</span><span class="step">03 Permissions</span><span class="step">04 Policy</span><span class="step">05 Review</span></div><div class="form-grid"><div class="field"><label>AGENT NAME</label><input class="field-input" placeholder="e.g. Finance Agent"></div><div class="field"><label>AGENT TYPE</label><select class="field-input"><option>Autonomous agent</option><option>Copilot</option><option>Workflow agent</option></select></div><div class="field"><label>ENVIRONMENT</label><select class="field-input"><option>Production</option><option>Staging</option><option>Development</option></select></div><div class="field"><label>OWNER</label><input class="field-input" value="Essakki"></div><div class="field full"><label>DESCRIPTION</label><input class="field-input" placeholder="What will this agent be responsible for?"></div></div><div class="form-footer"><button class="app-button" type="button">Cancel</button><button class="app-button primary register-submit" type="button">Continue to Connect →</button></div></div>`;
+  const register = () => `${header('ONBOARDING / NEW IDENTITY','Register a new agent','Create a governed identity before connecting it to production tools.') }<div class="app-card"><div class="stepper"><span class="step active">01 Identity</span><span class="step">02 Connect</span><span class="step">03 Permissions</span><span class="step">04 Policy</span><span class="step">05 Review</span></div><div class="form-grid"><div class="field"><label>AGENT NAME</label><input name="agent-name" class="field-input" placeholder="e.g. Finance Agent" required></div><div class="field"><label>AGENT TYPE</label><select name="agent-type" class="field-input"><option>Research</option><option>Finance</option><option>Support</option><option>Coding</option><option>Operations</option><option>Custom</option></select></div><div class="field"><label>PROVIDER</label><select name="agent-provider" class="field-input"><option>OpenAI</option><option>Anthropic</option><option>Google</option><option>Custom</option></select></div><div class="field"><label>ENVIRONMENT</label><select name="agent-environment" class="field-input"><option>Production</option><option>Staging</option><option>Development</option></select></div><div class="field"><label>VERSION</label><input name="agent-version" class="field-input" placeholder="e.g. 1.0.0"></div><div class="field"><label>ENDPOINT URL</label><input name="agent-endpoint" type="url" class="field-input" placeholder="https://example.com/agent"></div><div class="field full"><label>DESCRIPTION</label><input name="agent-description" class="field-input" placeholder="What will this agent be responsible for?"></div></div><div class="form-footer"><button class="app-button" type="button" data-cancel-register>Cancel</button><button class="app-button primary register-submit" type="button">Register Agent →</button></div></div>`;
   const routePages={overview,agents,policies,approvals,activity:activityPage,audit,integrations,api,secrets,incidents,security,team,settings,'agent-detail':agentDetail,register};
   const pageNames={overview:'Overview',agents:'Agents',policies:'Policies',approvals:'Approvals',activity:'Activity',audit:'Audit Trail',integrations:'Integrations',api:'API Access',secrets:'Secrets',incidents:'Security Incidents',security:'Security Posture',team:'Team',settings:'Settings','agent-detail':'Research Agent',register:'Register Agent'};
   const routeKey=()=>{const path=location.pathname.replace(/\/$/,''); if(path==='/dashboard'||path==='/app'||path==='')return 'overview'; if(path.includes('/agents/new'))return 'register'; if(path.includes('/agents/'))return 'agent-detail'; return ({'/dashboard':'overview','/app':'overview','/app/agents':'agents','/app/policies':'policies','/app/approvals':'approvals','/app/activity':'activity','/app/audit':'audit','/app/integrations':'integrations','/app/api':'api','/app/secrets':'secrets','/app/incidents':'incidents','/app/security':'security','/app/team':'team','/app/settings':'settings'})[path]||'overview'};
@@ -321,6 +321,19 @@
       if (small) small.textContent = sub;
     }
   };
+  const agentStatusKind = status => status === 'active' ? 'good' : status === 'paused' ? 'warn' : 'bad';
+  const renderAgentRows = records => records.length ? records.map(agent => `<tr data-agent-id="${esc(agent.id)}"><td data-label="AGENT" class="agent-name"><button class="row-action agent-detail" type="button">${esc(agent.name)} →</button><small class="app-kicker">${esc(agent.agent_type || 'TYPE NOT SET')} · ${esc(agent.provider || 'PROVIDER NOT SET')}</small></td><td data-label="STATUS">${statusBadge(`● ${agent.status}`, agentStatusKind(agent.status))}</td><td data-label="RISK">${statusBadge('—')}</td><td data-label="TOOLS">—</td><td data-label="LAST ACTIVE">${agent.last_seen_at ? formatTime(agent.last_seen_at) : 'No activity yet'}</td><td data-label="POLICY">Not configured</td><td data-label="ACTION"><button class="row-action agent-edit" type="button">Edit →</button><button class="row-action agent-status" type="button" data-next-status="${agent.status === 'active' ? 'paused' : 'active'}">${agent.status === 'active' ? 'Pause' : 'Enable'}</button><button class="row-action agent-delete" type="button">Delete</button></td></tr>`).join('') : `<tr><td colspan="7">${empty('Register an agent to begin governing autonomous actions.')}</td></tr>`;
+  const renderAgentsTable = records => {
+    const tbody = document.querySelector('.app-table tbody');
+    if (tbody) tbody.innerHTML = renderAgentRows(records);
+    const total = document.querySelector('.app-toolbar .app-kicker');
+    if (total) total.textContent = `${records.length} TOTAL / ${records.filter(item => item.status === 'active').length} ACTIVE`;
+  };
+  const loadAgents = async searchTerm => {
+    const records = await auth()?.getAgents?.(searchTerm || '');
+    renderAgentsTable(records || []);
+    return records || [];
+  };
 
   const sync = async () => {
     try {
@@ -354,10 +367,7 @@
 
       const route = location.pathname;
       if (route === '/app/agents') {
-        const tbody = document.querySelector('.app-table tbody');
-        if (tbody) tbody.innerHTML = data.agents.length ? data.agents.map(agent => `<tr><td data-label="AGENT" class="agent-name">${esc(agent.name)}</td><td data-label="STATUS">${statusBadge(`● ${agent.status}`)}</td><td data-label="RISK">${statusBadge(agent.risk_level, agent.risk_level === 'critical' ? 'bad' : agent.risk_level === 'low' ? 'good' : 'warn')}</td><td data-label="TOOLS">—</td><td data-label="LAST ACTIVE">${formatTime(agent.updated_at)}</td><td data-label="POLICY">—</td><td data-label="ACTION"><span class="app-kicker">LIVE</span></td></tr>`).join('') : `<tr><td colspan="7">${empty('Register an agent to begin governing autonomous actions.')}</td></tr>`;
-        const total = document.querySelector('.app-toolbar .app-kicker');
-        if (total) total.textContent = `${data.agents.length} TOTAL / ${data.agents.filter(item=>item.status==='active').length} ACTIVE`;
+        renderAgentsTable(data.agents);
       }
       if (route === '/app/policies') {
         const list = document.querySelector('.policy-list');
@@ -420,19 +430,87 @@
     if (!target) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    const fields = [...document.querySelectorAll('.form-grid .field-input')];
     try {
       target.disabled = true;
       target.textContent = 'CREATING…';
-      await auth().createAgent({ name: fields[0]?.value?.trim() || 'Untitled Agent', description: fields[3]?.value?.trim() || undefined });
+      const field = name => document.querySelector(`[name="${name}"]`);
+      const name = field('agent-name')?.value?.trim() || '';
+      const endpointUrl = field('agent-endpoint')?.value?.trim() || '';
+      if (!name) throw new Error('Agent name is required.');
+      if (endpointUrl) new URL(endpointUrl);
+      await auth().createAgent({
+        name,
+        agentType: field('agent-type')?.value,
+        provider: field('agent-provider')?.value,
+        environment: field('agent-environment')?.value,
+        version: field('agent-version')?.value,
+        endpointUrl,
+        description: field('agent-description')?.value,
+      });
       target.textContent = 'AGENT CREATED';
-      setTimeout(() => history.back(), 450);
+      toast('Agent registered', 'The Agent was saved to the current workspace.');
+      setTimeout(() => navigate('/app/agents'), 450);
     } catch (error) {
       target.disabled = false;
-      target.textContent = 'Continue to Connect →';
-      console.warn('Agent creation failed', error);
+      target.textContent = 'Register Agent →';
+      toast('Agent registration failed', error?.message || 'Please check the fields and try again.');
     }
   }, true);
+
+  document.addEventListener('input', event => {
+    const input = event.target.closest('.table-search');
+    if (!input || location.pathname !== '/app/agents') return;
+    clearTimeout(input._agentSearchTimer);
+    input._agentSearchTimer = setTimeout(async () => {
+      try { await loadAgents(input.value); } catch (error) { toast('Search unavailable', 'Could not load Agents from Supabase.'); }
+    }, 220);
+  });
+
+  const agentEditor = agent => `<h3>Edit Agent</h3><p>Update the registered identity metadata. Secrets are never stored here.</p><div class="form-grid"><div class="field"><label>AGENT NAME</label><input name="edit-agent-name" class="field-input" value="${esc(agent.name)}"></div><div class="field"><label>AGENT TYPE</label><select name="edit-agent-type" class="field-input">${['Research','Finance','Support','Coding','Operations','Custom'].map(value => `<option ${value === agent.agent_type ? 'selected' : ''}>${value}</option>`).join('')}</select></div><div class="field"><label>PROVIDER</label><select name="edit-agent-provider" class="field-input">${['OpenAI','Anthropic','Google','Custom'].map(value => `<option ${value === agent.provider ? 'selected' : ''}>${value}</option>`).join('')}</select></div><div class="field"><label>ENVIRONMENT</label><select name="edit-agent-environment" class="field-input">${['Production','Staging','Development'].map(value => `<option ${value === agent.environment ? 'selected' : ''}>${value}</option>`).join('')}</select></div><div class="field"><label>VERSION</label><input name="edit-agent-version" class="field-input" value="${esc(agent.version || '')}"></div><div class="field"><label>ENDPOINT URL</label><input name="edit-agent-endpoint" type="url" class="field-input" value="${esc(agent.endpoint_url || '')}"></div><div class="field full"><label>DESCRIPTION</label><input name="edit-agent-description" class="field-input" value="${esc(agent.description || '')}"></div></div><div class="form-footer"><button class="app-button modal-close" type="button">Cancel</button><button class="app-button primary save-agent" type="button" data-agent-id="${esc(agent.id)}">Save changes</button></div>`;
+
+  const getAgent = async id => (await auth().getAgents()).find(agent => agent.id === id);
+  document.addEventListener('click', async event => {
+    const target = event.target.closest('.agent-detail, .agent-edit, .agent-status, .agent-delete');
+    if (!target) return;
+    event.preventDefault();
+    const row = target.closest('[data-agent-id]');
+    if (!row) return;
+    try {
+      const agent = await getAgent(row.dataset.agentId);
+      if (!agent) throw new Error('Agent not found.');
+      if (target.classList.contains('agent-status')) {
+        target.disabled = true;
+        await auth().updateAgentStatus(agent.id, target.dataset.nextStatus);
+        toast('Agent status updated', `${agent.name} is now ${target.dataset.nextStatus}.`);
+        await sync();
+      } else if (target.classList.contains('agent-delete')) {
+        if (!confirm(`Delete ${agent.name}? This cannot be undone.`)) return;
+        target.disabled = true;
+        await auth().deleteAgent(agent.id);
+        toast('Agent deleted', `${agent.name} was removed from this workspace.`);
+        await sync();
+      } else if (target.classList.contains('agent-edit')) {
+        openModal(agentEditor(agent));
+      } else {
+        openDrawer(agent.name, `<p>${esc(agent.description || 'No description provided.')}</p><dl class="detail-list"><div><dt>AGENT ID</dt><dd>${esc(agent.id)}</dd></div><div><dt>SLUG</dt><dd>${esc(agent.slug)}</dd></div><div><dt>TYPE</dt><dd>${esc(agent.agent_type || '—')}</dd></div><div><dt>PROVIDER</dt><dd>${esc(agent.provider || '—')}</dd></div><div><dt>ENVIRONMENT</dt><dd>${esc(agent.environment || '—')}</dd></div><div><dt>VERSION</dt><dd>${esc(agent.version || '—')}</dd></div><div><dt>ENDPOINT</dt><dd>${esc(agent.endpoint_url || '—')}</dd></div><div><dt>STATUS</dt><dd>${esc(agent.status)}</dd></div><div><dt>CREATED</dt><dd>${esc(new Date(agent.created_at).toLocaleString())}</dd></div><div><dt>UPDATED</dt><dd>${esc(new Date(agent.updated_at).toLocaleString())}</dd></div><div><dt>LAST SEEN</dt><dd>${agent.last_seen_at ? esc(new Date(agent.last_seen_at).toLocaleString()) : 'No activity yet'}</dd></div></dl>`);
+      }
+    } catch (error) { toast('Agent action failed', error?.message || 'Please try again.'); }
+  });
+
+  document.addEventListener('click', async event => {
+    const target = event.target.closest('.save-agent');
+    if (!target) return;
+    try {
+      target.disabled = true;
+      const value = name => document.querySelector(`[name="${name}"]`)?.value || '';
+      const endpointUrl = value('edit-agent-endpoint').trim();
+      if (endpointUrl) new URL(endpointUrl);
+      await auth().updateAgent(target.dataset.agentId, { name: value('edit-agent-name'), agentType: value('edit-agent-type'), provider: value('edit-agent-provider'), environment: value('edit-agent-environment'), version: value('edit-agent-version'), endpointUrl, description: value('edit-agent-description') });
+      document.querySelector('#app-modal').hidden = true;
+      toast('Agent updated', 'The changes were saved to Supabase.');
+      await sync();
+    } catch (error) { target.disabled = false; toast('Agent update failed', error?.message || 'Please check the fields and try again.'); }
+  });
 
   document.addEventListener('click', async event => {
     const target = event.target.closest('#app-modal .app-button.primary');

@@ -14,6 +14,28 @@ export const supabase = url && publishableKey ? createClient(url, publishableKey
 
 export type AuthResult = { user: User | null; session: Session | null };
 
+export type AgentStatus = 'active' | 'paused' | 'disabled';
+export type AgentType = 'Research' | 'Finance' | 'Support' | 'Coding' | 'Operations' | 'Custom';
+export type AgentProvider = 'OpenAI' | 'Anthropic' | 'Google' | 'Custom';
+export type AgentEnvironment = 'Development' | 'Staging' | 'Production';
+export type AgentRecord = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  agent_type: AgentType | null;
+  provider: AgentProvider | null;
+  environment: AgentEnvironment | null;
+  version: string | null;
+  endpoint_url: string | null;
+  status: AgentStatus;
+  last_seen_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export function formatAuthError(error: unknown): string {
   if (!error) return 'An unexpected error occurred. Please try again.';
   const rawMsg = (error as { message?: string })?.message || String(error);
@@ -127,7 +149,7 @@ export const agentGuardAuth = {
       .maybeSingle();
 
     const [agents, policies, approvals, auditLogs, activity] = await Promise.all([
-      supabase.from('agents').select('id,name,status,risk_level,model,description,created_at,updated_at').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(50),
+      supabase.from('agents').select('id,workspace_id,name,slug,status,description,agent_type,provider,environment,version,endpoint_url,last_seen_at,created_by,created_at,updated_at').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(50),
       supabase.from('policies').select('id,name,description,enabled,created_at,updated_at').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(50),
       supabase.from('approval_requests').select('id,requested_action,requested_resource,risk_level,status,requested_amount,created_at').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(50),
       supabase.from('audit_logs').select('id,action,resource,result,risk_level,created_at').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(50),
@@ -145,15 +167,62 @@ export const agentGuardAuth = {
       activity: activity.data ?? [],
     };
   },
-  async createAgent(input: { name: string; description?: string; model?: string }) {
+  async getAgents(search = ''): Promise<AgentRecord[]> {
     if (!supabase) throw new Error('Authentication is not configured.');
     const data = await this.getWorkspaceData();
-    if (!data.workspaceId) throw new Error('No workspace is available for this account.');
-    const session = await this.getSession();
-    const { data: agent, error } = await supabase.from('agents').insert({ workspace_id: data.workspaceId, owner_id: session?.user.id, name: input.name, description: input.description || null, model: input.model || null }).select().single();
+    if (!data.workspaceId) return [];
+    let query = supabase.from('agents').select('id,workspace_id,name,slug,status,description,agent_type,provider,environment,version,endpoint_url,last_seen_at,created_by,created_at,updated_at').eq('workspace_id', data.workspaceId).order('created_at', { ascending: false }).limit(100);
+    const term = search.trim();
+    if (term) query = query.or(`name.ilike.%${term}%,slug.ilike.%${term}%,agent_type.ilike.%${term}%,provider.ilike.%${term}%`);
+    const { data: agents, error } = await query;
     if (error) throw new Error(formatAuthError(error));
-    await supabase.from('audit_logs').insert({ workspace_id: data.workspaceId, actor_id: session?.user.id, agent_id: agent.id, action: 'agent_created', resource: agent.name, result: 'allowed' });
-    return agent;
+    return (agents || []) as AgentRecord[];
+  },
+  async createAgent(input: { name: string; agentType: AgentType; provider: AgentProvider; environment: AgentEnvironment; description?: string; version?: string; endpointUrl?: string }) {
+    if (!supabase) throw new Error('Authentication is not configured.');
+    const data = await this.getWorkspaceData();
+    const session = await this.getSession();
+    if (!data.workspaceId || !session?.user) throw new Error('No workspace is available for this account.');
+    const name = input.name.trim();
+    if (!name) throw new Error('Agent name is required.');
+    const { data: agent, error } = await supabase.rpc('create_agent_with_slug', {
+      p_workspace_id: data.workspaceId,
+      p_created_by: session.user.id,
+      p_name: name,
+      p_agent_type: input.agentType,
+      p_provider: input.provider,
+      p_environment: input.environment,
+      p_description: input.description?.trim() || null,
+      p_version: input.version?.trim() || null,
+      p_endpoint_url: input.endpointUrl?.trim() || null,
+    });
+    if (error) throw new Error(formatAuthError(error));
+    return agent as AgentRecord;
+  },
+  async updateAgent(id: string, input: Partial<{ name: string; agentType: AgentType; provider: AgentProvider; environment: AgentEnvironment; description: string; version: string; endpointUrl: string }>): Promise<AgentRecord> {
+    if (!supabase) throw new Error('Authentication is not configured.');
+    const payload: Record<string, string | null> = {};
+    if (input.name !== undefined) payload.name = input.name.trim();
+    if (input.agentType !== undefined) payload.agent_type = input.agentType;
+    if (input.provider !== undefined) payload.provider = input.provider;
+    if (input.environment !== undefined) payload.environment = input.environment;
+    if (input.description !== undefined) payload.description = input.description.trim() || null;
+    if (input.version !== undefined) payload.version = input.version.trim() || null;
+    if (input.endpointUrl !== undefined) payload.endpoint_url = input.endpointUrl.trim() || null;
+    const { data: agent, error } = await supabase.from('agents').update(payload).eq('id', id).select('id,workspace_id,name,slug,status,description,agent_type,provider,environment,version,endpoint_url,last_seen_at,created_by,created_at,updated_at').single();
+    if (error) throw new Error(formatAuthError(error));
+    return agent as AgentRecord;
+  },
+  async updateAgentStatus(id: string, status: AgentStatus): Promise<AgentRecord> {
+    if (!supabase) throw new Error('Authentication is not configured.');
+    const { data: agent, error } = await supabase.from('agents').update({ status }).eq('id', id).select('id,workspace_id,name,slug,status,description,agent_type,provider,environment,version,endpoint_url,last_seen_at,created_by,created_at,updated_at').single();
+    if (error) throw new Error(formatAuthError(error));
+    return agent as AgentRecord;
+  },
+  async deleteAgent(id: string): Promise<void> {
+    if (!supabase) throw new Error('Authentication is not configured.');
+    const { error } = await supabase.from('agents').delete().eq('id', id);
+    if (error) throw new Error(formatAuthError(error));
   },
   async createPolicy(input: { name: string; description?: string }) {
     if (!supabase) throw new Error('Authentication is not configured.');
@@ -307,4 +376,3 @@ if (document.readyState === 'loading') {
 }
 
 (window as unknown as { AgentGuardAuth?: typeof agentGuardAuth }).AgentGuardAuth = agentGuardAuth;
-

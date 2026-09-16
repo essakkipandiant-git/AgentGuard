@@ -34,3 +34,24 @@ The migration also adds indexes for profile/user IDs, workspace owner IDs, works
 The migration file is `migrations/202609160001_agentguard_backend_foundation.sql`. It has been applied to Supabase project `irjwyxdlzbuuexftwuob`. For another environment, apply it through Supabase migrations tooling rather than manually editing tables.
 
 No new environment variables are required. The existing `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` remain the only browser-side Supabase settings, and no service-role key is used in client code.
+
+## Step 2: Agents
+
+The Step 2 migrations extend the existing `agents` table with `slug`, `agent_type`, `provider`, `environment`, `version`, `endpoint_url`, `last_seen_at`, and `created_by`. Existing `owner_id`, `risk_level`, and future-module foreign keys are preserved for compatibility. No provider credentials, passwords, or secrets are stored.
+
+Agent statuses are `active`, `paused`, and `disabled` (the legacy `archived` enum value is preserved for compatibility). Slugs are generated in the database and are unique within a workspace. The `create_agent_with_slug()` function derives the authenticated actor from `auth.uid()`, generates collision-safe slugs, and inserts the Agent into the caller's workspace.
+
+Agent RLS permissions are:
+
+| Role | Read | Create | Update | Status | Delete |
+| --- | --- | --- | --- | --- | --- |
+| owner | Yes | Yes | Yes | Yes | Yes |
+| admin | Yes | Yes | Yes | Yes | Yes |
+| developer | Yes | Yes | Yes | Yes | No |
+| security | Yes | No | No | No | No |
+| member | Yes | No | No | No | No |
+| viewer | Yes | No | No | No | No |
+
+RLS always remains the final boundary. Agent workspace and creator fields are immutable on update, preventing a client from moving an Agent across tenants. Search queries are issued to Supabase using case-insensitive filters on name, slug, type, and provider; another workspace's rows are never loaded for client-side filtering.
+
+The frontend service methods are exposed by the existing `AgentGuardAuth` object: `getAgents`, `createAgent`, `updateAgent`, `updateAgentStatus`, and `deleteAgent`. The existing Agents table, registration flow, detail drawer, edit modal, status actions, confirmation, loading/error feedback, and server-side search now use those methods without changing the page's visual system.
