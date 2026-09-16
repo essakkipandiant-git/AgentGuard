@@ -80,3 +80,15 @@ The database functions `create_policy_with_rules`, `assign_policy_to_agent`, and
 Migrations `202609160008_policies_crud_hardening.sql` and `202609160009_policy_rules_json_sync.sql` complete the Policy CRUD contract. Policies now use the controlled `policy_type` enum (`access`, `execution`, `data`, `tool`, `security`), support only `active` and `disabled` statuses, and persist a non-null object-shaped `rules` JSONB configuration. The editable `policy_rules` rows are mirrored into `policies.rules.items` as a future policy-evaluation snapshot; no enforcement engine is implemented.
 
 The database trigger derives `created_by` from `auth.uid()` on insert, generates a collision-safe workspace-local slug, and rejects changes to `workspace_id`, `created_by`, or `slug`. The policy RPC validates type, status, name, and rule structure. Policy list search remains server-side and workspace-scoped across name, slug, type, and description.
+
+## Step 4: Approvals
+
+Migrations `202609160010_approval_status_enum.sql` and `202609160011_approvals.sql` extend the existing `approval_requests` table in place. Approval requests now carry workspace, Agent, optional Policy, action, resource, reason, risk, controlled status, requester/reviewer, timestamps, expiration, decision reason, and object-shaped metadata. Composite workspace foreign keys prevent an approval from referencing an Agent or Policy in another workspace.
+
+Approval statuses are `pending`, `approved`, `denied`, `expired`, and `cancelled`. Risk levels reuse the existing `low`, `medium`, `high`, and `critical` enum. The database transition trigger rejects changes to finalized approvals, immutable ownership/reference changes, and reviewed states without a reviewer. `review_approval` derives `reviewed_by` from `auth.uid()`, rejects self-approval, prevents expired approvals from being reviewed, and only permits pending-to-approved or pending-to-denied transitions.
+
+Owners, admins, and security members may review requests. Owners, admins, security, developers, and members may create requests through the server-side `create_approval_request` RPC, which derives the workspace from the selected Agent and validates an optional Policy reference. Viewers are read-only. `expire_my_workspace_approvals` safely persists expired pending requests for the authenticated user’s workspaces without requiring a background worker. No runtime Agent interception, policy enforcement, Activity, or Audit Trail UI is implemented in Step 4.
+
+Migration `202609160012_approval_security_hardening.sql` further restricts updates to approval reviewers and requires finalized review metadata to match the authenticated reviewer. Requesters cannot directly mutate approval records after creation.
+
+Migrations `202609160013_remove_legacy_approval_policies.sql` and `202609160014_approval_rls_qualification.sql` remove stale approval policies and explicitly qualify Agent/Policy workspace checks. The legacy `rejected` enum label remains only for compatibility with the pre-Step-4 schema; all new review operations use `denied`.

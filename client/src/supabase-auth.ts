@@ -20,6 +20,8 @@ export type AgentProvider = 'OpenAI' | 'Anthropic' | 'Google' | 'Custom';
 export type AgentEnvironment = 'Development' | 'Staging' | 'Production';
 export type PolicyStatus = 'active' | 'disabled';
 export type PolicyType = 'access' | 'execution' | 'data' | 'tool' | 'security';
+export type ApprovalStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'cancelled';
+export type ApprovalRiskLevel = 'low' | 'medium' | 'high' | 'critical';
 export type PolicyEffect = 'allow' | 'deny';
 export type PolicyRiskLevel = 'low' | 'medium' | 'high' | 'critical';
 export type PolicyRuleInput = {
@@ -63,6 +65,27 @@ export type PolicyRecord = {
   updated_at: string;
   agent_count: number;
   rule_count: number;
+};
+export type ApprovalRecord = {
+  id: string;
+  workspace_id: string;
+  agent_id: string;
+  policy_id: string | null;
+  action: string;
+  resource: string | null;
+  reason: string | null;
+  risk_level: ApprovalRiskLevel;
+  status: ApprovalStatus;
+  requested_by: string;
+  reviewed_by: string | null;
+  requested_at: string;
+  reviewed_at: string | null;
+  expires_at: string | null;
+  decision_reason: string | null;
+  metadata: Record<string, unknown>;
+  updated_at: string;
+  agents?: { id: string; name: string; slug: string; status: string } | null;
+  policies?: { id: string; name: string; slug: string } | null;
 };
 export type AgentRecord = {
   id: string;
@@ -368,14 +391,31 @@ export const agentGuardAuth = {
     const { error } = await supabase.from('agent_policies').delete().eq('agent_id', agentId).eq('policy_id', policyId);
     if (error) throw new Error(formatAuthError(error));
   },
-  async decideApproval(id: string, status: 'approved' | 'rejected') {
+  async getApprovals(search = '', status: ApprovalStatus | 'all' = 'all', risk: ApprovalRiskLevel | 'all' = 'all'): Promise<ApprovalRecord[]> {
     if (!supabase) throw new Error('Authentication is not configured.');
-    const data = await this.getWorkspaceData();
-    const session = await this.getSession();
-    const { data: approval, error } = await supabase.from('approval_requests').update({ status, approver_id: session?.user.id, decision: status }).eq('id', id).select().single();
+    await supabase.rpc('expire_my_workspace_approvals');
+    const workspace = await this.getWorkspaceData();
+    if (!workspace.workspaceId) return [];
+    let query = supabase.from('approval_requests').select('id,workspace_id,agent_id,policy_id,action,resource,reason,risk_level,status,requested_by,reviewed_by,requested_at,reviewed_at,expires_at,decision_reason,metadata,updated_at,agents(id,name,slug,status),policies(id,name,slug)').eq('workspace_id', workspace.workspaceId).order('requested_at', { ascending: false }).limit(100);
+    if (status !== 'all') query = query.eq('status', status);
+    if (risk !== 'all') query = query.eq('risk_level', risk);
+    const term = search.trim();
+    if (term) query = query.or(`action.ilike.%${term}%,resource.ilike.%${term}%,reason.ilike.%${term}%,status.eq.${term},risk_level.eq.${term}`);
+    const { data, error } = await query;
     if (error) throw new Error(formatAuthError(error));
-    if (data.workspaceId) await supabase.from('audit_logs').insert({ workspace_id: data.workspaceId, actor_id: session?.user.id, action: `approval_${status}`, resource: approval.requested_resource, result: status });
-    return approval;
+    return (data || []).map(item => ({ ...item, agents: Array.isArray(item.agents) ? item.agents[0] || null : item.agents, policies: Array.isArray(item.policies) ? item.policies[0] || null : item.policies })) as unknown as ApprovalRecord[];
+  },
+  async createApproval(input: { agentId: string; action: string; resource?: string; policyId?: string; riskLevel: ApprovalRiskLevel; reason?: string; expiresAt?: string; metadata?: Record<string, unknown> }) {
+    if (!supabase) throw new Error('Authentication is not configured.');
+    const { data, error } = await supabase.rpc('create_approval_request', { p_agent_id: input.agentId, p_action: input.action.trim(), p_resource: input.resource?.trim() || null, p_policy_id: input.policyId || null, p_risk_level: input.riskLevel, p_reason: input.reason?.trim() || null, p_expires_at: input.expiresAt || null, p_metadata: input.metadata || {} });
+    if (error) throw new Error(formatAuthError(error));
+    return data as ApprovalRecord;
+  },
+  async decideApproval(id: string, status: 'approved' | 'denied', reason?: string) {
+    if (!supabase) throw new Error('Authentication is not configured.');
+    const { data, error } = await supabase.rpc('review_approval', { p_approval_id: id, p_status: status, p_reason: reason?.trim() || null });
+    if (error) throw new Error(formatAuthError(error));
+    return data as ApprovalRecord;
   },
 };
 

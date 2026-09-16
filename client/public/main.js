@@ -51,7 +51,7 @@
   const agentRows = '<tr><td colspan="7"><div class="app-empty-state"><strong>Loading Agents…</strong><span>Loading workspace Agents from Supabase.</span></div></td></tr>';
   const agents = () => `${header('IDENTITY / AGENTS','Agents','Manage identities, permissions and security posture for every autonomous agent.',button('+ Register Agent','app-button primary'))}<div class="app-table-wrap"><div class="app-toolbar"><input class="table-search" placeholder="Search agents" aria-label="Search agents" /><span class="app-kicker">LOADING</span></div><table class="app-table"><thead><tr><th>AGENT</th><th>STATUS</th><th>RISK</th><th>TOOLS</th><th>LAST ACTIVE</th><th>POLICY</th><th>ACTION</th></tr></thead><tbody>${agentRows}</tbody></table></div>`;
   const policies = () => `${header('POLICY ENGINE / GOVERNANCE','Policies','Define exactly what agents can access, execute and change.',button('+ Create Policy','app-button primary'))}<div class="app-toolbar"><input class="table-search policy-search" placeholder="Search policies" aria-label="Search policies" /></div><div class="policy-list"><div class="app-empty-state"><strong>Loading policies…</strong><span>Loading workspace policies from Supabase.</span></div></div>`;
-  const approvals = () => `${header('RISK / HUMAN REVIEW','Approvals','Review high-risk actions before they reach your infrastructure.',`<div class="app-kicker">12 PENDING / 84 APPROVED / 7 DENIED</div>`)}<div class="approval-list"><div class="approval-card"><div><span class="app-kicker">FINANCE AGENT / STRIPE</span><h3>Charge $2,400 <span class="status-badge warn">HIGH RISK</span></h3><p>Payment exceeds configured agent limit. Requested 09:41:04.</p></div><div class="approval-actions">${button('View Context')}<button class="app-button primary approve-action" type="button">Approve</button><button class="app-button danger deny-action" type="button">Deny</button></div></div><div class="approval-card"><div><span class="app-kicker">RESEARCH AGENT / DATABASE</span><h3>Write to customer_records <span class="status-badge warn">MEDIUM</span></h3><p>Write access requires human approval under research policy.</p></div><div class="approval-actions">${button('View Context')}<button class="app-button primary approve-action" type="button">Approve</button></div></div></div>`;
+  const approvals = () => `${header('RISK / HUMAN REVIEW','Approvals','Review high-risk actions before they reach your infrastructure.',`<span class="app-kicker approvals-summary">LOADING</span>`)}<div class="approval-list"><div class="app-empty-state"><strong>Loading approvals…</strong><span>Loading workspace approval requests from Supabase.</span></div></div>`;
   const activityPage = () => `${header('OBSERVABILITY / TELEMETRY','Agent Activity','Real-time operational view of every governed action.',`<select class="app-toolbar-select"><option>All Agents</option><option>Finance Agent</option><option>Research Agent</option></select>`)}<div class="app-grid four"><div class="app-card"><span class="card-label">ACTIONS / MIN</span><div class="metric-large"><strong>1,284</strong><small>LIVE</small></div></div><div class="app-card"><span class="card-label">ACTIVE AGENTS</span><div class="metric-large"><strong>24</strong><small>+2 today</small></div></div><div class="app-card"><span class="card-label">BLOCKED</span><div class="metric-large"><strong>37</strong><small>2 critical</small></div></div><div class="app-card"><span class="card-label">PENDING</span><div class="metric-large"><strong>12</strong><small>Needs review</small></div></div></div><div class="app-card" style="margin-top:16px"><div class="panel-title"><strong>LIVE STREAM</strong><span class="live-label"><i></i>EVENTS ARRIVING</span></div>${activity.replace('<div class="app-card activity-panel">','').replace('</div>','')}</div>`;
   const audit = () => `${header('FORENSICS / COMPLETE AUDITABILITY','Audit Trail','Every policy decision. Every action. Every agent.',button('Export CSV'))}<div class="app-table-wrap"><div class="app-toolbar"><input class="audit-search" placeholder="Search events, agents, tools" /><select class="audit-filter"><option>All results</option><option>Allowed</option><option>Blocked</option><option>Approval required</option></select><span class="app-kicker">1–25 OF 2,841 EVENTS</span></div><table class="app-table"><thead><tr><th>TIMESTAMP</th><th>AGENT</th><th>ACTION</th><th>RESOURCE</th><th>POLICY</th><th>RISK</th><th>RESULT</th></tr></thead><tbody><tr><td data-label="TIMESTAMP" class="mono">09:41:02</td><td data-label="AGENT">research-agent</td><td data-label="ACTION">READ</td><td data-label="RESOURCE">Gmail</td><td data-label="POLICY">read_email</td><td data-label="RISK">LOW</td><td data-label="RESULT">${badge('ALLOWED')}</td></tr><tr><td data-label="TIMESTAMP" class="mono">09:41:07</td><td data-label="AGENT">finance-agent</td><td data-label="ACTION">CHARGE</td><td data-label="RESOURCE">Stripe</td><td data-label="POLICY">payment_limit</td><td data-label="RISK">HIGH</td><td data-label="RESULT">${badge('BLOCKED','bad')}</td></tr><tr><td data-label="TIMESTAMP" class="mono">09:41:12</td><td data-label="AGENT">support-agent</td><td data-label="ACTION">UPDATE</td><td data-label="RESOURCE">Salesforce</td><td data-label="POLICY">crm_write</td><td data-label="RISK">MEDIUM</td><td data-label="RESULT">${badge('APPROVED')}</td></tr></tbody></table></div>`;
   const integrations = () => `${header('CONTROL PLANE / CONNECTIONS','Integrations','Connect the systems your agents interact with.',button('+ Connect Integration','app-button primary'))}<div class="integration-grid">${['OpenAI','Claude','Gmail','Slack','PostgreSQL','MySQL','Salesforce','Jira','AWS','Kubernetes','Stripe','Payment APIs'].map((name,i)=>`<div class="integration-card"><div class="integration-icon">${name.slice(0,2).toUpperCase()}</div><h3>${name}</h3><p>${i%3===0?'AI model provider':'Agent tool connection'}</p>${i%3===0?badge('CONNECTED'):`<button class="app-button connect-action" type="button">Connect</button>`}</div>`).join('')}</div>`;
@@ -340,6 +340,26 @@
     renderPolicyCards(records || []);
     return records || [];
   };
+  const approvalStatusKind = status => status === 'approved' ? 'good' : status === 'denied' || status === 'expired' || status === 'cancelled' ? 'bad' : 'warn';
+  const renderApprovals = records => {
+    const list = document.querySelector('.approval-list');
+    if (!list) return;
+    const pending = records.filter(item => item.status === 'pending').length;
+    const summary = document.querySelector('.approvals-summary');
+    if (summary) summary.textContent = `${pending} PENDING / ${records.filter(item => item.status === 'approved').length} APPROVED / ${records.filter(item => item.status === 'denied').length} DENIED`;
+    document.querySelector('.nav-count')?.replaceChildren(document.createTextNode(String(pending)));
+    list.innerHTML = records.length ? records.map(item => {
+      const agentName = item.agents?.name || item.agent_id;
+      const policyName = item.policies?.name || 'No policy';
+      const canReview = item.status === 'pending';
+      return `<div class="approval-card" data-approval-id="${esc(item.id)}"><div><span class="app-kicker">${esc(agentName)} / ${esc(item.resource || 'ACTION')}</span><h3>${esc(item.action)} ${statusBadge(item.risk_level.toUpperCase(), item.risk_level === 'low' ? 'good' : 'warn')}</h3><p>${esc(item.reason || `${policyName} requires human approval.`)} Requested ${formatTime(item.requested_at)} · ${statusBadge(item.status, approvalStatusKind(item.status))}</p></div><div class="approval-actions"><button class="app-button approval-context" type="button" data-approval-id="${esc(item.id)}">View Context</button>${canReview ? `<button class="app-button primary live-approve" type="button" data-approval-id="${esc(item.id)}">Approve</button><button class="app-button danger live-deny" type="button" data-approval-id="${esc(item.id)}">Deny</button>` : ''}</div></div>`;
+    }).join('') : '<div class="app-empty-state"><strong>No approval requests yet</strong><span>Approval requests will appear here when a governed action requires human review.</span></div>';
+  };
+  const loadApprovals = async () => {
+    const records = await auth()?.getApprovals?.();
+    renderApprovals(records || []);
+    return records || [];
+  };
   const loadAgents = async searchTerm => {
     const records = await auth()?.getAgents?.(searchTerm || '');
     renderAgentsTable(records || []);
@@ -390,8 +410,7 @@
         }
       }
       if (route === '/app/approvals') {
-        const list = document.querySelector('.approval-list');
-        if (list) list.innerHTML = data.approvals.length ? data.approvals.map(item => `<div class="approval-card" data-approval-id="${esc(item.id)}"><div><span class="app-kicker">${esc(item.requested_resource || 'RESOURCE')}</span><h3>${esc(item.requested_action)} ${statusBadge(item.risk_level,'warn')}</h3><p>${esc(item.status)} · Requested ${formatTime(item.created_at)}</p></div><div class="approval-actions">${item.status === 'pending' ? '<button class="app-button primary live-approve" type="button">Approve</button><button class="app-button danger live-deny" type="button">Deny</button>' : `<span class="app-kicker">${esc(item.status).toUpperCase()}</span>`}</div></div>`).join('') : empty('Approval requests will appear here when agents require human review.');
+        try { await loadApprovals(); } catch (error) { const list = document.querySelector('.approval-list'); if (list) list.innerHTML = `<div class="app-empty-state"><strong>Approvals could not be loaded</strong><span>${esc(error?.message || 'Please refresh and try again.')}</span></div>`; console.warn('AgentGuard approval data unavailable', error); }
       }
       if (route === '/app/activity') {
         const items = [...document.querySelectorAll('.activity-item')];
@@ -433,13 +452,29 @@
     const card = target.closest('[data-approval-id]');
     try {
       target.disabled = true;
-      await auth().decideApproval(card.dataset.approvalId, target.classList.contains('live-approve') ? 'approved' : 'rejected');
+      await auth().decideApproval(card.dataset.approvalId, target.classList.contains('live-approve') ? 'approved' : 'denied');
+      toast(target.classList.contains('live-approve') ? 'Approval approved' : 'Approval denied', 'The persisted approval status was updated.');
       await sync();
     } catch (error) {
       target.disabled = false;
+      toast('Approval review failed', error?.message || 'This approval may already be finalized.');
       console.warn('Approval decision failed', error);
     }
   }, true);
+
+  document.addEventListener('click', async event => {
+    const target = event.target.closest('.approval-context');
+    if (!target) return;
+    try {
+      const approval = (await auth().getApprovals?.() || []).find(item => item.id === target.dataset.approvalId);
+      if (!approval) throw new Error('Approval not found.');
+      const drawer = document.querySelector('#app-drawer');
+      drawer.hidden = false;
+      drawer.innerHTML = `<div class="drawer-backdrop"></div><div class="drawer-panel"><button class="drawer-close" type="button">×</button><span class="app-kicker">APPROVAL CONTEXT</span><h2 style="margin:18px 0 10px;font-size:23px">${esc(approval.action)}</h2><dl class="detail-list"><div><dt>APPROVAL ID</dt><dd class="mono">${esc(approval.id)}</dd></div><div><dt>AGENT</dt><dd>${esc(approval.agents?.name || approval.agent_id)}</dd></div><div><dt>RESOURCE</dt><dd>${esc(approval.resource || '—')}</dd></div><div><dt>POLICY</dt><dd>${esc(approval.policies?.name || approval.policy_id || '—')}</dd></div><div><dt>RISK</dt><dd>${esc(approval.risk_level)}</dd></div><div><dt>STATUS</dt><dd>${esc(approval.status)}</dd></div><div><dt>REASON</dt><dd>${esc(approval.reason || '—')}</dd></div><div><dt>REQUESTED BY</dt><dd class="mono">${esc(approval.requested_by)}</dd></div><div><dt>REQUESTED</dt><dd>${esc(new Date(approval.requested_at).toLocaleString())}</dd></div><div><dt>REVIEWED BY</dt><dd class="mono">${esc(approval.reviewed_by || '—')}</dd></div><div><dt>REVIEWED</dt><dd>${approval.reviewed_at ? esc(new Date(approval.reviewed_at).toLocaleString()) : '—'}</dd></div><div><dt>EXPIRES</dt><dd>${approval.expires_at ? esc(new Date(approval.expires_at).toLocaleString()) : '—'}</dd></div></dl><h3>Metadata</h3><pre class="code-block">${esc(JSON.stringify(approval.metadata || {}, null, 2))}</pre></div>`;
+      drawer.querySelector('.drawer-backdrop').onclick = () => drawer.hidden = true;
+      drawer.querySelector('.drawer-close').onclick = () => drawer.hidden = true;
+    } catch (error) { toast('Context unavailable', error?.message || 'Could not load this approval.'); }
+  });
 
   document.addEventListener('click', async event => {
     const target = event.target.closest('.register-submit');
