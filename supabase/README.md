@@ -55,3 +55,22 @@ Agent RLS permissions are:
 RLS always remains the final boundary. Agent workspace and creator fields are immutable on update, preventing a client from moving an Agent across tenants. Search queries are issued to Supabase using case-insensitive filters on name, slug, type, and provider; another workspace's rows are never loaded for client-side filtering.
 
 The frontend service methods are exposed by the existing `AgentGuardAuth` object: `getAgents`, `createAgent`, `updateAgent`, `updateAgentStatus`, and `deleteAgent`. The existing Agents table, registration flow, detail drawer, edit modal, status actions, confirmation, loading/error feedback, and server-side search now use those methods without changing the page's visual system.
+
+## Step 3: Policies, Policy Rules, and Agent Assignments
+
+Migration `202609160006_policies_rules_assignments.sql` migrates the existing compatible `policies` and `policy_rules` tables in place and adds the workspace-safe `agent_policies` join table. Policies have stable workspace-local slugs, `active`/`disabled`/`draft` status, a reliable integer version, optional default marking, and authenticated `created_by` ownership. Legacy `enabled`, `permission`, `risk_threshold`, and `requires_approval` columns remain synchronized for compatibility with the existing foundation.
+
+`policy_rules` now stores deterministic `rule_order`, name, description, action, optional resource, `allow`/`deny` effect, low/medium/high/critical risk, approval requirement, and object-shaped JSONB conditions. Rule insert/update/delete triggers increment the parent policy version and update its timestamp. Rules are never runtime-evaluated in Step 3.
+
+`agent_policies` uses composite workspace foreign keys to ensure the assigned Agent and Policy belong to the same workspace. The `(agent_id, policy_id)` primary key prevents duplicate assignments. A policy cannot be deleted while assigned; the safe delete RPC returns an actionable error instead of silently removing relationships.
+
+| Role | Read policies/rules/assignments | Create/update policies and rules | Assign policies | Delete policies |
+| --- | --- | --- | --- | --- |
+| owner | Yes | Yes | Yes | Yes |
+| admin | Yes | Yes | Yes | Yes |
+| security | Yes | Yes | Yes | No |
+| developer | Yes | Yes | Yes | No |
+| member | Yes | No | No | No |
+| viewer | Yes | No | No | No |
+
+The database functions `create_policy_with_rules`, `assign_policy_to_agent`, and `delete_policy_safely` derive authorization from the authenticated session and perform workspace checks server-side. `create_policy_with_rules` creates the policy and supplied rules atomically, generates collision-safe slugs, validates statuses/effects/risks, and rejects malformed conditions. No SDK, evaluator, middleware, action interception, approval enforcement, or runtime policy engine is included.
