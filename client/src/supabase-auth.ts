@@ -274,8 +274,12 @@ export const agentGuardAuth = {
     let query = supabase.from('policies').select('id,workspace_id,name,slug,description,status,version,is_default,created_by,created_at,updated_at').eq('workspace_id', workspace.workspaceId).order('updated_at', { ascending: false }).limit(100);
     const term = search.trim();
     if (term) query = query.or(`name.ilike.%${term}%,slug.ilike.%${term}%,description.ilike.%${term}%`);
-    const { data, error } = await query;
-    if (error) throw new Error(formatAuthError(error));
+    let { data, error } = await query;
+    if (error) {
+      const fallback = await supabase.from('policies').select('id,workspace_id,name,description,enabled,created_by,created_at,updated_at').eq('workspace_id', workspace.workspaceId).order('updated_at', { ascending: false }).limit(100);
+      if (fallback.error) throw new Error(formatAuthError(error));
+      data = (fallback.data || []).map(policy => ({ ...policy, slug: policy.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), status: policy.enabled ? 'active' : 'disabled', version: 1, is_default: false }));
+    }
     const ids = (data || []).map(policy => policy.id);
     if (!ids.length) return [];
     const [{ data: rules, error: rulesError }, { data: assignments, error: assignmentsError }] = await Promise.all([
