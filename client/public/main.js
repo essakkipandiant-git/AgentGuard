@@ -31,7 +31,7 @@
   const flowObserver=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.querySelectorAll('.product-flow span').forEach((step,index)=>setTimeout(()=>step.classList.add('lit'),index*170));flowObserver.unobserve(entry.target)}}),{threshold:.3});const flow=document.querySelector('.product-flow');if(flow)flowObserver.observe(flow);
 })();
 (() => {
-  const isAppRoute = location.pathname === '/app' || location.pathname.startsWith('/app/');
+  const isAppRoute = location.pathname === '/dashboard' || location.pathname === '/app' || location.pathname.startsWith('/app/');
   if (!isAppRoute) return;
   document.body.classList.add('app-route');
   document.querySelectorAll('.hero-screen,body>main,.final-cta,.site-footer').forEach(el => el.hidden = true);
@@ -65,7 +65,7 @@
   const register = () => `${header('ONBOARDING / NEW IDENTITY','Register a new agent','Create a governed identity before connecting it to production tools.') }<div class="app-card"><div class="stepper"><span class="step active">01 Identity</span><span class="step">02 Connect</span><span class="step">03 Permissions</span><span class="step">04 Policy</span><span class="step">05 Review</span></div><div class="form-grid"><div class="field"><label>AGENT NAME</label><input class="field-input" placeholder="e.g. Finance Agent"></div><div class="field"><label>AGENT TYPE</label><select class="field-input"><option>Autonomous agent</option><option>Copilot</option><option>Workflow agent</option></select></div><div class="field"><label>ENVIRONMENT</label><select class="field-input"><option>Production</option><option>Staging</option><option>Development</option></select></div><div class="field"><label>OWNER</label><input class="field-input" value="Essakki"></div><div class="field full"><label>DESCRIPTION</label><input class="field-input" placeholder="What will this agent be responsible for?"></div></div><div class="form-footer"><button class="app-button" type="button">Cancel</button><button class="app-button primary register-submit" type="button">Continue to Connect →</button></div></div>`;
   const routePages={overview,agents,policies,approvals,activity:activityPage,audit,integrations,api,secrets,incidents,security,team,settings,'agent-detail':agentDetail,register};
   const pageNames={overview:'Overview',agents:'Agents',policies:'Policies',approvals:'Approvals',activity:'Activity',audit:'Audit Trail',integrations:'Integrations',api:'API Access',secrets:'Secrets',incidents:'Security Incidents',security:'Security Posture',team:'Team',settings:'Settings','agent-detail':'Research Agent',register:'Register Agent'};
-  const routeKey=()=>{const path=location.pathname.replace(/\/$/,''); if(path.includes('/agents/new'))return 'register'; if(path.includes('/agents/'))return 'agent-detail'; return ({'/app':'overview','/app/agents':'agents','/app/policies':'policies','/app/approvals':'approvals','/app/activity':'activity','/app/audit':'audit','/app/integrations':'integrations','/app/api':'api','/app/secrets':'secrets','/app/incidents':'incidents','/app/security':'security','/app/team':'team','/app/settings':'settings'})[path]||'overview'};
+  const routeKey=()=>{const path=location.pathname.replace(/\/$/,''); if(path==='/dashboard'||path==='/app'||path==='')return 'overview'; if(path.includes('/agents/new'))return 'register'; if(path.includes('/agents/'))return 'agent-detail'; return ({'/dashboard':'overview','/app':'overview','/app/agents':'agents','/app/policies':'policies','/app/approvals':'approvals','/app/activity':'activity','/app/audit':'audit','/app/integrations':'integrations','/app/api':'api','/app/secrets':'secrets','/app/incidents':'incidents','/app/security':'security','/app/team':'team','/app/settings':'settings'})[path]||'overview'};
   const render=()=>{const key=routeKey(); main.innerHTML=routePages[key](); title.textContent=pageNames[key];crumb.textContent=pageNames[key].toUpperCase(); document.querySelectorAll('.app-nav a').forEach(a=>a.classList.toggle('active',a.dataset.route===key)); bindPage(key); main.scrollTop=0; window.scrollTo(0,0)};
   const navigate=href=>{history.pushState({},'',href);render();if(innerWidth<760)sidebar.classList.remove('sidebar-open')};
   const openModal=(html)=>{const modal=document.querySelector('#app-modal');modal.hidden=false;modal.innerHTML=`<div class="modal-backdrop"></div><div class="modal-panel"><button class="drawer-close modal-close">×</button>${html}</div>`;modal.querySelector('.modal-backdrop').onclick=()=>modal.hidden=true;modal.querySelector('.modal-close').onclick=()=>modal.hidden=true};
@@ -80,14 +80,16 @@
 (() => {
   const tab = document.querySelector('#signin');
   if (!tab) return;
-  const openers = document.querySelectorAll('a[href="#signin"]');
+  const openers = document.querySelectorAll('a[href="#signin"], a[href="/login"]');
   const closeButtons = tab.querySelectorAll('[data-close-signin]');
   const form = tab.querySelector('.signin-form');
   const error = tab.querySelector('.signin-error');
   const submit = tab.querySelector('.signin-submit');
+  const googleBtn = tab.querySelector('.signin-provider');
   const password = tab.querySelector('[name="signin-password"]');
   const focusable = () => [...tab.querySelectorAll('button,input,a')].filter(el => !el.disabled);
   let lastFocused = null;
+
   const open = event => {
     event?.preventDefault();
     lastFocused = document.activeElement;
@@ -96,85 +98,362 @@
     document.querySelector('.signin-panel h2')?.focus?.();
     tab.querySelector('[name="signin-email"]')?.focus();
   };
+
   const close = event => {
     event?.preventDefault();
     tab.hidden = true;
     document.body.classList.remove('signin-open');
     error.hidden = true;
     form?.reset();
-    if (submit) { submit.disabled = false; submit.classList.remove('loading'); submit.innerHTML = 'Sign in <i class="fa-solid fa-arrow-right"></i>'; }
+    if (submit) {
+      submit.disabled = false;
+      submit.classList.remove('loading', 'success');
+      submit.innerHTML = authMode === 'signup' ? 'Create workspace <i class="fa-solid fa-arrow-right"></i>' : 'Sign in <i class="fa-solid fa-arrow-right"></i>';
+    }
+    if (googleBtn) {
+      googleBtn.disabled = false;
+      googleBtn.innerHTML = '<span class="provider-mark">G</span>Continue with Google';
+    }
     lastFocused?.focus?.();
   };
+
   openers.forEach(link => link.addEventListener('click', open));
-  if (new URLSearchParams(window.location.search).get('signin') === '1') setTimeout(() => open(), 0);
+
+  // Handle URL query parameters or direct /login route
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('signin') === '1' || window.location.pathname === '/login') {
+    setTimeout(() => open(), 0);
+  }
+  if (urlParams.get('error')) {
+    setTimeout(() => {
+      open();
+      const errParam = urlParams.get('error');
+      error.textContent = errParam === 'oauth_failed'
+        ? 'Google sign-in could not be completed. Please try again.'
+        : decodeURIComponent(errParam);
+      error.hidden = false;
+    }, 50);
+  }
+
   closeButtons.forEach(button => button.addEventListener('click', close));
-  tab.addEventListener('click', async event => { const link = event.target.closest('[data-forgot-password]'); if (!link) return; event.preventDefault(); const email = form.elements['signin-email'].value.trim(); if (!/^\S+@\S+\.\S+$/.test(email)) { error.textContent = 'Enter your work email first, then choose Forgot password.'; error.hidden = false; return; } try { await window.AgentGuardAuth.resetPassword(email); error.textContent = 'Password reset instructions sent. Check your inbox.'; error.hidden = false; } catch (err) { error.textContent = err?.message || 'Unable to send reset instructions.'; error.hidden = false; } });
+
+  // Google OAuth click handler
+  googleBtn?.addEventListener('click', async () => {
+    error.hidden = true;
+    googleBtn.disabled = true;
+    googleBtn.innerHTML = '<span class="provider-mark"><i class="fa-solid fa-spinner fa-spin"></i></span>Connecting to Google...';
+    try {
+      const auth = window.AgentGuardAuth;
+      if (!auth?.signInWithGoogle) throw new Error('Authentication service is initializing. Please try again in a moment.');
+      await auth.signInWithGoogle();
+    } catch (err) {
+      googleBtn.disabled = false;
+      googleBtn.innerHTML = '<span class="provider-mark">G</span>Continue with Google';
+      error.textContent = window.AgentGuardAuth?.formatAuthError?.(err) || err?.message || 'Google sign-in failed. Please try again.';
+      error.hidden = false;
+    }
+  });
+
+  // Forgot password handler
+  tab.addEventListener('click', async event => {
+    const link = event.target.closest('[data-forgot-password]');
+    if (!link) return;
+    event.preventDefault();
+    const email = form.elements['signin-email'].value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      error.textContent = 'Enter your work email first, then click Forgot password.';
+      error.hidden = false;
+      return;
+    }
+    try {
+      await window.AgentGuardAuth.resetPassword(email);
+      error.textContent = 'Password reset instructions sent. Check your inbox.';
+      error.hidden = false;
+    } catch (err) {
+      error.textContent = window.AgentGuardAuth?.formatAuthError?.(err) || 'Unable to send reset instructions.';
+      error.hidden = false;
+    }
+  });
+
   tab.querySelector('[data-contact-signin]')?.addEventListener('click', close);
-  tab.querySelector('.signin-show-password')?.addEventListener('click', event => { const shown = password.type === 'password'; password.type = shown ? 'text' : 'password'; event.currentTarget.setAttribute('aria-label', shown ? 'Hide password' : 'Show password'); event.currentTarget.innerHTML = `<i class="fa-regular ${shown ? 'fa-eye-slash' : 'fa-eye'}"></i>`; });
+
+  tab.querySelector('.signin-show-password')?.addEventListener('click', event => {
+    const shown = password.type === 'password';
+    password.type = shown ? 'text' : 'password';
+    event.currentTarget.setAttribute('aria-label', shown ? 'Hide password' : 'Show password');
+    event.currentTarget.innerHTML = `<i class="fa-regular ${shown ? 'fa-eye-slash' : 'fa-eye'}"></i>`;
+  });
+
   let authMode = 'signin';
-  const setMode = mode => { authMode = mode; const signup = mode === 'signup'; tab.querySelector('.signin-kicker').textContent = signup ? 'ONBOARDING / CREATE WORKSPACE' : 'AUTHENTICATION / SECURE ACCESS'; tab.querySelector('#signin-title').innerHTML = signup ? 'Secure your agents.<br><em>Create a workspace.</em>' : 'Sign in to your<br><em>control plane.</em>'; tab.querySelector('.signin-intro').textContent = signup ? 'Create your AgentGuard workspace and put every autonomous action behind a policy.' : 'Access your governed agents, policies and live operational activity.'; const emailLabel=form.querySelector('[name=signin-email]').closest('label'); if (signup && !form.querySelector('[name=signin-name]')) emailLabel.insertAdjacentHTML('beforebegin','<label>FULL NAME<input name="signin-name" type="text" placeholder="Your name" required></label><label>COMPANY<input name="signin-company" type="text" placeholder="Company name" required></label>'); form.querySelector('.signin-options').innerHTML = signup ? '<label class="signin-remember"><input name="signin-terms" type="checkbox" required> <span>I agree to the Terms and Privacy Policy.</span></label>' : '<label class="signin-remember"><input type="checkbox"> <span>Remember me</span></label><a href="#signin" data-forgot-password>Forgot password?</a>'; submit.innerHTML = signup ? 'Create workspace <i class="fa-solid fa-arrow-right"></i>' : 'Sign in <i class="fa-solid fa-arrow-right"></i>'; const create=tab.querySelector('[data-create-account]'); if(create) create.textContent=signup ? 'Already have an account? Sign in' : 'Create an account'; };
-  form?.addEventListener('submit', async event => { event.preventDefault(); const email = form.elements['signin-email'].value.trim(); const pass = form.elements['signin-password'].value; const valid = /^\S+@\S+\.\S+$/.test(email) && pass.length >= 6 && (!form.elements['signin-name'] || (form.elements['signin-name'].value.trim() && form.elements['signin-company'].value.trim() && form.elements['signin-terms'].checked)); if (!valid) { error.textContent = authMode === 'signup' ? 'Complete all fields, use a 6+ character password, and accept the terms.' : 'Enter a valid work email and a password of at least 6 characters.'; error.hidden = false; return; } error.hidden = true; submit.disabled = true; submit.classList.add('loading'); submit.textContent = 'AUTHENTICATING...'; try { const auth = window.AgentGuardAuth; if (!auth) throw new Error('Authentication is still loading. Please try again.'); if (authMode === 'signup') { const result = await auth.signUp(form.elements['signin-name'].value.trim(), email, pass, form.elements['signin-company'].value.trim()); if (!result.session) { submit.disabled=false; submit.classList.remove('loading'); submit.textContent='CHECK YOUR EMAIL'; error.textContent='Check your inbox to confirm your AgentGuard account.'; error.hidden=false; return; } } else { await auth.signIn(email, pass); } submit.classList.remove('loading'); submit.classList.add('success'); submit.innerHTML = 'ACCESS GRANTED <i class="fa-solid fa-check"></i>'; setTimeout(() => { location.href='/dashboard'; }, 500); } catch (err) { submit.disabled=false; submit.classList.remove('loading'); submit.innerHTML = authMode === 'signup' ? 'Create workspace <i class="fa-solid fa-arrow-right"></i>' : 'Sign in <i class="fa-solid fa-arrow-right"></i>'; error.textContent = err?.message || 'Authentication failed. Please try again.'; error.hidden=false; } });
-  tab.querySelector('[data-create-account]')?.addEventListener('click', event => { event.preventDefault(); if (authMode === 'signup') { setMode('signin'); } else { setMode('signup'); } });
-  document.addEventListener('keydown', event => { if (tab.hidden) return; if (event.key === 'Escape') close(event); if (event.key === 'Tab') { const items = focusable(); if (!items.length) return; const first = items[0], last = items[items.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } } });
+  const setMode = mode => {
+    authMode = mode;
+    const signup = mode === 'signup';
+    tab.querySelector('.signin-kicker').textContent = signup ? 'ONBOARDING / CREATE WORKSPACE' : 'AUTHENTICATION / SECURE ACCESS';
+    tab.querySelector('#signin-title').innerHTML = signup ? 'Secure your agents.<br><em>Create a workspace.</em>' : 'Sign in to your<br><em>control plane.</em>';
+    tab.querySelector('.signin-intro').textContent = signup ? 'Create your AgentGuard workspace and put every autonomous action behind a policy.' : 'Access your governed agents, policies and live operational activity.';
+    const emailLabel = form.querySelector('[name=signin-email]').closest('label');
+    if (signup && !form.querySelector('[name=signin-name]')) {
+      emailLabel.insertAdjacentHTML('beforebegin', '<label>FULL NAME<input name="signin-name" type="text" placeholder="Your name" required></label><label>COMPANY<input name="signin-company" type="text" placeholder="Company name" required></label>');
+    }
+    form.querySelector('.signin-options').innerHTML = signup
+      ? '<label class="signin-remember"><input name="signin-terms" type="checkbox" required> <span>I agree to the Terms and Privacy Policy.</span></label>'
+      : '<label class="signin-remember"><input type="checkbox"> <span>Remember me</span></label><a href="#signin" data-forgot-password>Forgot password?</a>';
+    submit.innerHTML = signup ? 'Create workspace <i class="fa-solid fa-arrow-right"></i>' : 'Sign in <i class="fa-solid fa-arrow-right"></i>';
+    const create = tab.querySelector('[data-create-account]');
+    if (create) create.textContent = signup ? 'Already have an account? Sign in' : 'Create an account';
+  };
+
+  form?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const email = form.elements['signin-email'].value.trim();
+    const pass = form.elements['signin-password'].value;
+    const valid = /^\S+@\S+\.\S+$/.test(email) && pass.length >= 6 && (!form.elements['signin-name'] || (form.elements['signin-name'].value.trim() && form.elements['signin-company'].value.trim() && form.elements['signin-terms'].checked));
+    
+    if (!valid) {
+      error.textContent = authMode === 'signup'
+        ? 'Complete all fields, use a 6+ character password, and accept the terms.'
+        : 'Enter a valid work email and a password of at least 6 characters.';
+      error.hidden = false;
+      return;
+    }
+    
+    error.hidden = true;
+    submit.disabled = true;
+    submit.classList.add('loading');
+    submit.textContent = 'AUTHENTICATING...';
+
+    try {
+      const auth = window.AgentGuardAuth;
+      if (!auth) throw new Error('Authentication is still loading. Please try again.');
+      
+      if (authMode === 'signup') {
+        const result = await auth.signUp(form.elements['signin-name'].value.trim(), email, pass, form.elements['signin-company'].value.trim());
+        if (!result.session) {
+          submit.disabled = false;
+          submit.classList.remove('loading');
+          submit.textContent = 'CHECK YOUR EMAIL';
+          error.textContent = 'Account created. Check your inbox to confirm your email before signing in.';
+          error.hidden = false;
+          return;
+        }
+      } else {
+        await auth.signIn(email, pass);
+      }
+      
+      submit.classList.remove('loading');
+      submit.classList.add('success');
+      submit.innerHTML = 'ACCESS GRANTED <i class="fa-solid fa-check"></i>';
+      setTimeout(() => { location.href = '/dashboard'; }, 400);
+    } catch (err) {
+      submit.disabled = false;
+      submit.classList.remove('loading');
+      submit.innerHTML = authMode === 'signup' ? 'Create workspace <i class="fa-solid fa-arrow-right"></i>' : 'Sign in <i class="fa-solid fa-arrow-right"></i>';
+      error.textContent = window.AgentGuardAuth?.formatAuthError?.(err) || err?.message || 'Authentication failed. Please try again.';
+      error.hidden = false;
+    }
+  });
+
+  tab.querySelector('[data-create-account]')?.addEventListener('click', event => {
+    event.preventDefault();
+    if (authMode === 'signup') {
+      setMode('signin');
+    } else {
+      setMode('signup');
+    }
+  });
+
+  document.addEventListener('keydown', event => {
+    if (tab.hidden) return;
+    if (event.key === 'Escape') close(event);
+    if (event.key === 'Tab') {
+      const items = focusable();
+      if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  });
 })();
 
 (() => {
-  const protectedRoute = ['/dashboard', '/app', '/agents', '/policies', '/activity', '/security'].some(path => location.pathname === path || location.pathname.startsWith(`${path}/`));
-  if (!protectedRoute) return;
-  const check = () => window.AgentGuardAuth?.getSession?.().then(session => { if (!session) location.replace('/?signin=1'); });
+  const isProtected = ['/dashboard', '/app', '/agents', '/policies', '/activity', '/security'].some(
+    path => location.pathname === path || location.pathname.startsWith(`${path}/`)
+  );
+
+  const check = () => window.AgentGuardAuth?.getSession?.().then(session => {
+    if (isProtected && !session) {
+      location.replace('/?signin=1');
+    } else if (session && (location.pathname === '/login' || (location.pathname === '/' && location.search.includes('signin=1')))) {
+      location.replace('/dashboard');
+    }
+  });
+
   setTimeout(check, 120);
+
+  window.addEventListener('agentguard:auth-state', (e) => {
+    const session = e.detail;
+    if (isProtected && !session) {
+      location.replace('/?signin=1');
+    }
+  });
 })();
 
 (() => {
-  if (!location.pathname.startsWith('/app')) return;
+  const isApp = location.pathname === '/dashboard' || location.pathname === '/app' || location.pathname.startsWith('/app/');
+  if (!isApp) return;
+
   const auth = () => window.AgentGuardAuth;
   const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const empty = (message, colspan = 1) => `<div class="app-empty-state"><strong>No live records yet</strong><span>${esc(message)}</span></div>`;
   const formatTime = value => value ? new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
   const statusBadge = (value, kind='good') => `<span class="status-badge ${kind}">${esc(String(value || '').toUpperCase())}</span>`;
-  const setMetric = (label, value, sub='LIVE') => { const card = [...document.querySelectorAll('.app-card')].find(el => el.querySelector('.card-label')?.textContent.trim() === label); if (card) { const strong=card.querySelector('.metric-large strong'); const small=card.querySelector('.metric-large small'); if(strong) strong.textContent=String(value); if(small) small.textContent=sub; } };
+  const setMetric = (label, value, sub='LIVE') => {
+    const card = [...document.querySelectorAll('.app-card')].find(el => el.querySelector('.card-label')?.textContent.trim() === label);
+    if (card) {
+      const strong = card.querySelector('.metric-large strong');
+      const small = card.querySelector('.metric-large small');
+      if (strong) strong.textContent = String(value);
+      if (small) small.textContent = sub;
+    }
+  };
+
   const sync = async () => {
     try {
+      const session = await auth()?.getSession?.();
+      if (session?.user) {
+        const userEmail = session.user.email || '';
+        const userName = session.user.user_metadata?.full_name || userEmail.split('@')[0] || 'User';
+        const initials = userName.slice(0, 2).toUpperCase();
+        document.querySelectorAll('.user-avatar').forEach(el => el.textContent = initials);
+        const profileBtn = document.querySelector('.profile-button');
+        if (profileBtn) {
+          const strong = profileBtn.querySelector('strong');
+          const small = profileBtn.querySelector('small');
+          if (strong) strong.textContent = userName;
+          if (small) small.textContent = userEmail;
+        }
+      }
+
       const data = await auth()?.getWorkspaceData?.();
       if (!data) return;
+
+      if (data.workspaceName) {
+        const wsBtn = document.querySelector('.workspace-button');
+        if (wsBtn) wsBtn.innerHTML = `${esc(data.workspaceName)} <span>⌄</span>`;
+      }
+
       setMetric('ACTIVE AGENTS', data.agents.filter(item => item.status === 'active').length, 'FROM SUPABASE');
       setMetric('GOVERNED ACTIONS', data.activity.length, 'RECENT EVENTS');
       setMetric('BLOCKED ACTIONS', data.activity.filter(item => String(item.status || '').toLowerCase() === 'blocked' || String(item.policy_decision || '').toLowerCase() === 'blocked').length, 'FROM ACTIVITY');
       setMetric('PENDING APPROVALS', data.approvals.filter(item => item.status === 'pending').length, 'FROM SUPABASE');
+
       const route = location.pathname;
       if (route === '/app/agents') {
         const tbody = document.querySelector('.app-table tbody');
         if (tbody) tbody.innerHTML = data.agents.length ? data.agents.map(agent => `<tr><td data-label="AGENT" class="agent-name">${esc(agent.name)}</td><td data-label="STATUS">${statusBadge(`● ${agent.status}`)}</td><td data-label="RISK">${statusBadge(agent.risk_level, agent.risk_level === 'critical' ? 'bad' : agent.risk_level === 'low' ? 'good' : 'warn')}</td><td data-label="TOOLS">—</td><td data-label="LAST ACTIVE">${formatTime(agent.updated_at)}</td><td data-label="POLICY">—</td><td data-label="ACTION"><span class="app-kicker">LIVE</span></td></tr>`).join('') : `<tr><td colspan="7">${empty('Register an agent to begin governing autonomous actions.')}</td></tr>`;
-        const total = document.querySelector('.app-toolbar .app-kicker'); if(total) total.textContent = `${data.agents.length} TOTAL / ${data.agents.filter(item=>item.status==='active').length} ACTIVE`;
+        const total = document.querySelector('.app-toolbar .app-kicker');
+        if (total) total.textContent = `${data.agents.length} TOTAL / ${data.agents.filter(item=>item.status==='active').length} ACTIVE`;
       }
-      if (route === '/app/policies') { const list=document.querySelector('.policy-list'); if(list) list.innerHTML=data.policies.length ? data.policies.map(policy=>`<div class="policy-card"><div><h3>${esc(policy.name)}</h3><p>${esc(policy.description || 'Workspace policy')} · LIVE DATA</p></div><div class="policy-meta"><b>${policy.enabled?'ENABLED':'DISABLED'}</b><br>${formatTime(policy.updated_at)}</div></div>`).join('') : empty('Create a policy to define governed actions for this workspace.'); }
-      if (route === '/app/approvals') { const list=document.querySelector('.approval-list'); if(list) list.innerHTML=data.approvals.length ? data.approvals.map(item=>`<div class="approval-card" data-approval-id="${esc(item.id)}"><div><span class="app-kicker">${esc(item.requested_resource || 'RESOURCE')}</span><h3>${esc(item.requested_action)} ${statusBadge(item.risk_level,'warn')}</h3><p>${esc(item.status)} · Requested ${formatTime(item.created_at)}</p></div><div class="approval-actions">${item.status === 'pending' ? '<button class="app-button primary live-approve" type="button">Approve</button><button class="app-button danger live-deny" type="button">Deny</button>' : `<span class="app-kicker">${esc(item.status).toUpperCase()}</span>`}</div></div>`).join('') : empty('Approval requests will appear here when agents require human review.'); }
-      if (route === '/app/activity') { const items=[...document.querySelectorAll('.activity-item')]; if(data.activity.length) items.slice(0, data.activity.length).forEach((node,index)=>{ const item=data.activity[index]; node.innerHTML=`<time>${formatTime(item.created_at)}</time><b>${esc(item.action)}</b><span>${esc(item.tool || 'Agent event')}</span>${statusBadge(item.status || item.policy_decision || 'RECORDED')}`; }); else document.querySelector('.app-card[style*="margin-top"]')?.insertAdjacentHTML('beforeend', empty('Activity events will appear after governed actions are recorded.')); }
-      if (route === '/app/audit') { const tbody=document.querySelector('.app-table tbody'); if(tbody) tbody.innerHTML=data.auditLogs.length ? data.auditLogs.map(item=>`<tr><td data-label="TIMESTAMP" class="mono">${formatTime(item.created_at)}</td><td data-label="AGENT">—</td><td data-label="ACTION">${esc(item.action)}</td><td data-label="RESOURCE">${esc(item.resource || '—')}</td><td data-label="POLICY">—</td><td data-label="RISK">${esc(item.risk_level || '—')}</td><td data-label="RESULT">${statusBadge(item.result || 'RECORDED')}</td></tr>`).join('') : `<tr><td colspan="7">${empty('Audit events will appear here as security actions are recorded.')}</td></tr>`; }
-    } catch (error) { console.warn('AgentGuard live data unavailable', error); }
+      if (route === '/app/policies') {
+        const list = document.querySelector('.policy-list');
+        if (list) list.innerHTML = data.policies.length ? data.policies.map(policy => `<div class="policy-card"><div><h3>${esc(policy.name)}</h3><p>${esc(policy.description || 'Workspace policy')} · LIVE DATA</p></div><div class="policy-meta"><b>${policy.enabled?'ENABLED':'DISABLED'}</b><br>${formatTime(policy.updated_at)}</div></div>`).join('') : empty('Create a policy to define governed actions for this workspace.');
+      }
+      if (route === '/app/approvals') {
+        const list = document.querySelector('.approval-list');
+        if (list) list.innerHTML = data.approvals.length ? data.approvals.map(item => `<div class="approval-card" data-approval-id="${esc(item.id)}"><div><span class="app-kicker">${esc(item.requested_resource || 'RESOURCE')}</span><h3>${esc(item.requested_action)} ${statusBadge(item.risk_level,'warn')}</h3><p>${esc(item.status)} · Requested ${formatTime(item.created_at)}</p></div><div class="approval-actions">${item.status === 'pending' ? '<button class="app-button primary live-approve" type="button">Approve</button><button class="app-button danger live-deny" type="button">Deny</button>' : `<span class="app-kicker">${esc(item.status).toUpperCase()}</span>`}</div></div>`).join('') : empty('Approval requests will appear here when agents require human review.');
+      }
+      if (route === '/app/activity') {
+        const items = [...document.querySelectorAll('.activity-item')];
+        if (data.activity.length) {
+          items.slice(0, data.activity.length).forEach((node, index) => {
+            const item = data.activity[index];
+            node.innerHTML = `<time>${formatTime(item.created_at)}</time><b>${esc(item.action)}</b><span>${esc(item.tool || 'Agent event')}</span>${statusBadge(item.status || item.policy_decision || 'RECORDED')}`;
+          });
+        } else {
+          document.querySelector('.app-card[style*="margin-top"]')?.insertAdjacentHTML('beforeend', empty('Activity events will appear after governed actions are recorded.'));
+        }
+      }
+      if (route === '/app/audit') {
+        const tbody = document.querySelector('.app-table tbody');
+        if (tbody) tbody.innerHTML = data.auditLogs.length ? data.auditLogs.map(item => `<tr><td data-label="TIMESTAMP" class="mono">${formatTime(item.created_at)}</td><td data-label="AGENT">—</td><td data-label="ACTION">${esc(item.action)}</td><td data-label="RESOURCE">${esc(item.resource || '—')}</td><td data-label="POLICY">—</td><td data-label="RISK">${esc(item.risk_level || '—')}</td><td data-label="RESULT">${statusBadge(item.result || 'RECORDED')}</td></tr>`).join('') : `<tr><td colspan="7">${empty('Audit events will appear here as security actions are recorded.')}</td></tr>`;
+      }
+    } catch (error) {
+      console.warn('AgentGuard live data unavailable', error);
+    }
   };
+
+  // Sign out click handler on profile button
+  document.querySelector('.profile-button')?.addEventListener('click', async () => {
+    if (confirm('Sign out of AgentGuard?')) {
+      await auth()?.signOut?.();
+      location.replace('/');
+    }
+  });
+
   window.addEventListener('agentguard:auth-state', () => setTimeout(sync, 50));
   window.addEventListener('popstate', () => setTimeout(sync, 50));
   setTimeout(sync, 180);
+
   document.addEventListener('click', async event => {
     const target = event.target.closest('.live-approve, .live-deny');
     if (!target) return;
-    event.preventDefault(); event.stopImmediatePropagation();
+    event.preventDefault();
+    event.stopImmediatePropagation();
     const card = target.closest('[data-approval-id]');
-    try { target.disabled = true; await auth().decideApproval(card.dataset.approvalId, target.classList.contains('live-approve') ? 'approved' : 'rejected'); await sync(); } catch (error) { target.disabled = false; console.warn('Approval decision failed', error); }
+    try {
+      target.disabled = true;
+      await auth().decideApproval(card.dataset.approvalId, target.classList.contains('live-approve') ? 'approved' : 'rejected');
+      await sync();
+    } catch (error) {
+      target.disabled = false;
+      console.warn('Approval decision failed', error);
+    }
   }, true);
+
   document.addEventListener('click', async event => {
     const target = event.target.closest('.register-submit');
     if (!target) return;
-    event.preventDefault(); event.stopImmediatePropagation();
+    event.preventDefault();
+    event.stopImmediatePropagation();
     const fields = [...document.querySelectorAll('.form-grid .field-input')];
-    try { target.disabled = true; target.textContent = 'CREATING…'; await auth().createAgent({ name: fields[0]?.value?.trim() || 'Untitled Agent', description: fields[3]?.value?.trim() || undefined }); target.textContent = 'AGENT CREATED'; setTimeout(() => history.back(), 450); } catch (error) { target.disabled = false; target.textContent = 'Continue to Connect →'; console.warn('Agent creation failed', error); }
+    try {
+      target.disabled = true;
+      target.textContent = 'CREATING…';
+      await auth().createAgent({ name: fields[0]?.value?.trim() || 'Untitled Agent', description: fields[3]?.value?.trim() || undefined });
+      target.textContent = 'AGENT CREATED';
+      setTimeout(() => history.back(), 450);
+    } catch (error) {
+      target.disabled = false;
+      target.textContent = 'Continue to Connect →';
+      console.warn('Agent creation failed', error);
+    }
   }, true);
+
   document.addEventListener('click', async event => {
     const target = event.target.closest('#app-modal .app-button.primary');
     if (!target || !/create policy/i.test(target.textContent || '')) return;
-    event.preventDefault(); event.stopImmediatePropagation();
+    event.preventDefault();
+    event.stopImmediatePropagation();
     const input = document.querySelector('#app-modal input.field-input');
-    try { target.disabled = true; target.textContent = 'CREATING…'; await auth().createPolicy({ name: input?.value?.trim() || 'Untitled Policy' }); target.textContent = 'POLICY CREATED'; setTimeout(() => { document.querySelector('#app-modal').hidden = true; history.pushState({}, '', '/app/policies'); window.dispatchEvent(new PopStateEvent('popstate')); }, 450); } catch (error) { target.disabled = false; target.textContent = 'Create Policy'; console.warn('Policy creation failed', error); }
+    try {
+      target.disabled = true;
+      target.textContent = 'CREATING…';
+      await auth().createPolicy({ name: input?.value?.trim() || 'Untitled Policy' });
+      target.textContent = 'POLICY CREATED';
+      setTimeout(() => {
+        document.querySelector('#app-modal').hidden = true;
+        history.pushState({}, '', '/app/policies');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }, 450);
+    } catch (error) {
+      target.disabled = false;
+      target.textContent = 'Create Policy';
+      console.warn('Policy creation failed', error);
+    }
   }, true);
 })();
