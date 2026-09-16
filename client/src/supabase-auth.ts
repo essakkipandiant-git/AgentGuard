@@ -271,16 +271,22 @@ export const agentGuardAuth = {
     if (!supabase) throw new Error('Authentication is not configured.');
     const workspace = await this.getWorkspaceData();
     if (!workspace.workspaceId) return [];
-    let query = supabase.from('policies').select('id,workspace_id,name,slug,description,status,version,is_default,created_by,created_at,updated_at,policy_rules(count),agent_policies(count)').eq('workspace_id', workspace.workspaceId).order('updated_at', { ascending: false }).limit(100);
+    let query = supabase.from('policies').select('id,workspace_id,name,slug,description,status,version,is_default,created_by,created_at,updated_at').eq('workspace_id', workspace.workspaceId).order('updated_at', { ascending: false }).limit(100);
     const term = search.trim();
     if (term) query = query.or(`name.ilike.%${term}%,slug.ilike.%${term}%,description.ilike.%${term}%`);
     const { data, error } = await query;
     if (error) throw new Error(formatAuthError(error));
-    return (data || []).map((policy) => ({
-      ...policy,
-      agent_count: Number((policy.agent_policies as { count?: number }[] | undefined)?.[0]?.count || 0),
-      rule_count: Number((policy.policy_rules as { count?: number }[] | undefined)?.[0]?.count || 0),
-    })) as PolicyRecord[];
+    const ids = (data || []).map(policy => policy.id);
+    if (!ids.length) return [];
+    const [{ data: rules, error: rulesError }, { data: assignments, error: assignmentsError }] = await Promise.all([
+      supabase.from('policy_rules').select('policy_id').in('policy_id', ids).limit(1000),
+      supabase.from('agent_policies').select('policy_id').in('policy_id', ids).limit(1000),
+    ]);
+    if (rulesError) throw new Error(formatAuthError(rulesError));
+    if (assignmentsError) throw new Error(formatAuthError(assignmentsError));
+    const ruleCounts = (rules || []).reduce<Record<string, number>>((counts, rule) => { counts[rule.policy_id] = (counts[rule.policy_id] || 0) + 1; return counts; }, {});
+    const agentCounts = (assignments || []).reduce<Record<string, number>>((counts, assignment) => { counts[assignment.policy_id] = (counts[assignment.policy_id] || 0) + 1; return counts; }, {});
+    return (data || []).map(policy => ({ ...policy, agent_count: agentCounts[policy.id] || 0, rule_count: ruleCounts[policy.id] || 0 })) as PolicyRecord[];
   },
   async getPolicy(id: string) {
     if (!supabase) throw new Error('Authentication is not configured.');
