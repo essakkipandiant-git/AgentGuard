@@ -74,3 +74,9 @@ Migration `202609160006_policies_rules_assignments.sql` migrates the existing co
 | viewer | Yes | No | No | No |
 
 The database functions `create_policy_with_rules`, `assign_policy_to_agent`, and `delete_policy_safely` derive authorization from the authenticated session and perform workspace checks server-side. `create_policy_with_rules` creates the policy and supplied rules atomically, generates collision-safe slugs, validates statuses/effects/risks, and rejects malformed conditions. No SDK, evaluator, middleware, action interception, approval enforcement, or runtime policy engine is included.
+
+## Step 3 CRUD hardening
+
+Migrations `202609160008_policies_crud_hardening.sql` and `202609160009_policy_rules_json_sync.sql` complete the Policy CRUD contract. Policies now use the controlled `policy_type` enum (`access`, `execution`, `data`, `tool`, `security`), support only `active` and `disabled` statuses, and persist a non-null object-shaped `rules` JSONB configuration. The editable `policy_rules` rows are mirrored into `policies.rules.items` as a future policy-evaluation snapshot; no enforcement engine is implemented.
+
+The database trigger derives `created_by` from `auth.uid()` on insert, generates a collision-safe workspace-local slug, and rejects changes to `workspace_id`, `created_by`, or `slug`. The policy RPC validates type, status, name, and rule structure. Policy list search remains server-side and workspace-scoped across name, slug, type, and description.

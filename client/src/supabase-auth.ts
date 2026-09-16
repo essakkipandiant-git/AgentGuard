@@ -18,7 +18,8 @@ export type AgentStatus = 'active' | 'paused' | 'disabled';
 export type AgentType = 'Research' | 'Finance' | 'Support' | 'Coding' | 'Operations' | 'Custom';
 export type AgentProvider = 'OpenAI' | 'Anthropic' | 'Google' | 'Custom';
 export type AgentEnvironment = 'Development' | 'Staging' | 'Production';
-export type PolicyStatus = 'active' | 'disabled' | 'draft';
+export type PolicyStatus = 'active' | 'disabled';
+export type PolicyType = 'access' | 'execution' | 'data' | 'tool' | 'security';
 export type PolicyEffect = 'allow' | 'deny';
 export type PolicyRiskLevel = 'low' | 'medium' | 'high' | 'critical';
 export type PolicyRuleInput = {
@@ -51,8 +52,10 @@ export type PolicyRecord = {
   workspace_id: string;
   name: string;
   slug: string;
+  policy_type: PolicyType;
   description: string | null;
   status: PolicyStatus;
+  rules: Record<string, unknown>;
   version: number;
   is_default: boolean;
   created_by: string;
@@ -271,14 +274,14 @@ export const agentGuardAuth = {
     if (!supabase) throw new Error('Authentication is not configured.');
     const workspace = await this.getWorkspaceData();
     if (!workspace.workspaceId) return [];
-    let query = supabase.from('policies').select('id,workspace_id,name,slug,description,status,version,is_default,created_by,created_at,updated_at').eq('workspace_id', workspace.workspaceId).order('updated_at', { ascending: false }).limit(100);
+    let query = supabase.from('policies').select('id,workspace_id,name,slug,policy_type,description,status,rules,version,is_default,created_by,created_at,updated_at').eq('workspace_id', workspace.workspaceId).order('updated_at', { ascending: false }).limit(100);
     const term = search.trim();
-    if (term) query = query.or(`name.ilike.%${term}%,slug.ilike.%${term}%,description.ilike.%${term}%`);
+    if (term) query = query.or(`name.ilike.%${term}%,slug.ilike.%${term}%,policy_type.eq.${term},description.ilike.%${term}%`);
     let { data, error } = await query;
     if (error) {
       const fallback = await supabase.from('policies').select('id,workspace_id,name,description,enabled,created_by,created_at,updated_at').eq('workspace_id', workspace.workspaceId).order('updated_at', { ascending: false }).limit(100);
       if (fallback.error) throw new Error(formatAuthError(error));
-      data = (fallback.data || []).map(policy => ({ ...policy, slug: policy.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), status: policy.enabled ? 'active' : 'disabled', version: 1, is_default: false }));
+      data = (fallback.data || []).map(policy => ({ ...policy, slug: policy.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), policy_type: 'access', status: policy.enabled ? 'active' : 'disabled', rules: {}, version: 1, is_default: false }));
     }
     const ids = (data || []).map(policy => policy.id);
     if (!ids.length) return [];
@@ -294,29 +297,30 @@ export const agentGuardAuth = {
   },
   async getPolicy(id: string) {
     if (!supabase) throw new Error('Authentication is not configured.');
-    const { data: policy, error } = await supabase.from('policies').select('id,workspace_id,name,slug,description,status,version,is_default,created_by,created_at,updated_at,policy_rules(id,policy_id,rule_order,name,description,action,resource,effect,risk_level,approval_required,conditions,created_at,updated_at),agent_policies(agent_id,assigned_at,agents(id,name,slug,status))').eq('id', id).single();
+    const { data: policy, error } = await supabase.from('policies').select('id,workspace_id,name,slug,policy_type,description,status,rules,version,is_default,created_by,created_at,updated_at,policy_rules(id,policy_id,rule_order,name,description,action,resource,effect,risk_level,approval_required,conditions,created_at,updated_at),agent_policies(agent_id,assigned_at,agents(id,name,slug,status))').eq('id', id).single();
     if (error) throw new Error(formatAuthError(error));
     return policy;
   },
-  async createPolicy(input: { name: string; description?: string; status?: PolicyStatus; rules?: PolicyRuleInput[] }) {
+  async createPolicy(input: { name: string; policyType: PolicyType; description?: string; status?: PolicyStatus; rules?: PolicyRuleInput[] }) {
     if (!supabase) throw new Error('Authentication is not configured.');
     const name = input.name.trim();
     if (!name) throw new Error('Policy name is required.');
     const rules = (input.rules || []).map(rule => ({ name: rule.name.trim(), description: rule.description?.trim() || null, action: rule.action.trim(), resource: rule.resource?.trim() || null, effect: rule.effect, risk_level: rule.riskLevel, approval_required: Boolean(rule.approvalRequired), conditions: rule.conditions || {} }));
-    const { data, error } = await supabase.rpc('create_policy_with_rules', { p_name: name, p_description: input.description?.trim() || null, p_status: input.status || 'draft', p_rules: rules });
+    const { data, error } = await supabase.rpc('create_policy_with_rules', { p_name: name, p_description: input.description?.trim() || null, p_policy_type: input.policyType, p_status: input.status || 'disabled', p_rules: rules });
     if (error) throw new Error(formatAuthError(error));
     return data as PolicyRecord;
   },
-  async updatePolicy(id: string, input: { name?: string; description?: string; status?: PolicyStatus }) {
+  async updatePolicy(id: string, input: { name?: string; policyType?: PolicyType; description?: string; status?: PolicyStatus }) {
     if (!supabase) throw new Error('Authentication is not configured.');
     const current = await this.getPolicy(id);
     const payload: Record<string, string | number | boolean | null> = {};
     if (input.name !== undefined) payload.name = input.name.trim();
+    if (input.policyType !== undefined) payload.policy_type = input.policyType;
     if (input.description !== undefined) payload.description = input.description.trim() || null;
     if (input.status !== undefined) payload.status = input.status;
-    const definitionChanged = input.name !== undefined && input.name.trim() !== current.name || input.description !== undefined && (input.description.trim() || null) !== current.description || input.status !== undefined && input.status !== current.status;
+    const definitionChanged = input.name !== undefined && input.name.trim() !== current.name || input.policyType !== undefined && input.policyType !== current.policy_type || input.description !== undefined && (input.description.trim() || null) !== current.description || input.status !== undefined && input.status !== current.status;
     if (definitionChanged) payload.version = current.version + 1;
-    const { data, error } = await supabase.from('policies').update(payload).eq('id', id).select('id,workspace_id,name,slug,description,status,version,is_default,created_by,created_at,updated_at').single();
+    const { data, error } = await supabase.from('policies').update(payload).eq('id', id).select('id,workspace_id,name,slug,policy_type,description,status,rules,version,is_default,created_by,created_at,updated_at').single();
     if (error) throw new Error(formatAuthError(error));
     return data as PolicyRecord;
   },
