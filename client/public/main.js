@@ -381,7 +381,13 @@
         renderAgentsTable(data.agents);
       }
       if (route === '/app/policies') {
-        await loadPolicies(document.querySelector('.policy-search')?.value || '');
+        try {
+          await loadPolicies(document.querySelector('.policy-search')?.value || '');
+        } catch (error) {
+          const list = document.querySelector('.policy-list');
+          if (list) list.innerHTML = `<div class="app-empty-state"><strong>Policies could not be loaded</strong><span>${esc(error?.message || 'Please refresh and try again.')}</span></div>`;
+          console.warn('AgentGuard policy data unavailable', error);
+        }
       }
       if (route === '/app/approvals') {
         const list = document.querySelector('.approval-list');
